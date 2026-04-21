@@ -1,0 +1,21 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Cortex
+Comment=Advanced AI Agent Platform by AetherAssembly
+Exec=/usr/local/bin/cortex-launcher
+Icon=cortex
+Terminal=false
+Categories=Utility;AI;Chat;
+StartupNotify=true
+StartupWMClass=Cortex
+X-GNOME-Autostart-enabled=false
+
+# Application metadata
+X-AppStream-Ignore=false
+Keywords=AI;Agent;Memory;Dream;Tools;Chat;
+
+# Organization info
+X-Cortex-Organization=AetherAssembly
+X-Cortex-Website=https://cortex.aetherassembly.org
+X-Cortex-Support=support@aetherassembly.org

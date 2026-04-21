@@ -1,0 +1,276 @@
+################################################################################
+# Cortex Configuration
+# Organization: AetherAssembly
+# License: MIT
+# 
+# Production-ready configuration for Cortex AI Agent Platform
+# For local overrides, create config.local.yaml
+################################################################################
+
+app:
+  name: Cortex AI Agent Platform
+  version: 1.0.0
+  organization: AetherAssembly
+  env: development  # development, staging, production
+  debug: false
+
+# Frontend Configuration
+frontend:
+  port: 5173
+  host: 0.0.0.0
+  enable_hot_reload: true
+  build_dir: ./dist
+
+# Backend API Configuration
+backend:
+  port: 8000
+  host: 0.0.0.0
+  workers: 4  # Number of worker processes
+  log_level: INFO  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  reload: true  # Hot reload on file changes (development only)
+
+# Database Configuration
+database:
+  provider: postgresql  # postgresql, sqlite
+  url: postgresql://cortex:cortex@localhost:5432/cortex_dev
+  # For SQLite: sqlite:///./data/cortex.db
+  pool_size: 20
+  max_overflow: 40
+  echo: false  # Log SQL queries
+
+# Core Features
+features:
+  memory_system: true
+  dreaming_engine: true
+  tool_execution: true
+  streaming: true
+  web_search: false
+  code_execution: true
+
+# Memory System Configuration
+memory:
+  # Database-backed memory (production)
+  backend: database
+  # Alternative: file (markdown files)
+  # Categories for memory organization
+  categories:
+    - knowledge
+    - events
+    - preferences
+    - skills
+    - relationships
+    - goals
+    - insights
+  
+  # Vector similarity threshold (0-1)
+  similarity_threshold: 0.7
+  
+  # Auto-save interval (seconds)
+  auto_save_interval: 300
+
+# Dreaming Engine Configuration
+dreaming:
+  enabled: true
+  schedule: "0 3 * * *"  # 3 AM daily (cron format)
+  cycle_duration: 300  # seconds
+  phases:
+    light_sleep: 60
+    deep_sleep: 80
+    rem: 100
+    consolidation: 50
+    waking: 10
+
+# Tool Execution Configuration
+tools:
+  # Built-in tools
+  calculator:
+    enabled: true
+  
+  code_executor:
+    enabled: true
+    timeout: 30  # seconds
+    sandbox: true
+    allowed_imports:
+      - math
+      - json
+      - datetime
+  
+  web_search:
+    enabled: false
+    # Requires API key configuration
+    provider: duckduckgo  # duckduckgo, google, bing
+  
+  memory_search:
+    enabled: true
+    max_results: 10
+
+# Security Configuration
+security:
+  secret_key: ${SECRET_KEY:-change-me-in-production}
+  algorithm: HS256
+  access_token_expire_minutes: 30
+  
+  # CORS Configuration
+  cors:
+    enabled: true
+    origins:
+      - http://localhost:5173
+      - http://localhost:3000
+      - http://0.0.0.0:5173
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - OPTIONS
+    allow_credentials: true
+
+# Authentication Configuration
+auth:
+  enabled: true
+  jwt_secret: ${SECRET_KEY:-change-me-in-production}
+  jwt_algorithm: HS256
+  
+  # Authentication providers
+  providers:
+    local: true  # Local username/password
+    oauth: false  # OAuth2 integration
+    ldap: false   # LDAP integration
+
+# Discord Bot Integration
+discord:
+  enabled: false
+  bot_token: ${DISCORD_BOT_TOKEN:- }
+  guild_id: ${DISCORD_GUILD_ID:- }
+  allowed_channels: ${DISCORD_ALLOWED_CHANNELS:- }
+  allowed_users: ${DISCORD_ALLOWED_USERS:- }
+  prefix: !
+
+# Email Configuration (for notifications)
+email:
+  enabled: false
+  smtp_host: ${SMTP_HOST:-smtp.gmail.com}
+  smtp_port: ${SMTP_PORT:-587}
+  smtp_user: ${SMTP_USER:- }
+  smtp_password: ${SMTP_PASSWORD:- }
+  from_email: ${SMTP_FROM:-support@aetherassembly.org}
+  from_name: Cortex
+
+# Logging Configuration
+logging:
+  level: INFO
+  format: json  # json, text
+  output:
+    console: true
+    file: true
+    file_path: ./logs/cortex.log
+  
+  # Log rotation
+  rotation:
+    max_size: 10485760  # 10MB
+    backup_count: 5
+
+# API Documentation
+api_docs:
+  enabled: true
+  swagger_ui: true  # /docs
+  redoc: true       # /redoc
+  openapi_url: /openapi.json
+
+# Performance Configuration
+performance:
+  # Connection pooling
+  db_pool_size: 20
+  db_max_overflow: 40
+  
+  # Caching
+  cache_enabled: true
+  cache_ttl: 300  # seconds
+  
+  # Rate limiting
+  rate_limit_enabled: false
+  rate_limit: 100  # requests per minute
+
+# Model Configuration
+models:
+  # Default model for LLM operations
+  default: gpt-4
+  
+  # Available models/providers
+  providers:
+    ollama:
+      enabled: false
+      base_url: http://localhost:11434
+      model: mistral
+    
+    openai:
+      enabled: false
+      api_key: ${OPENAI_API_KEY:- }
+      model: gpt-4
+    
+    anthropic:
+      enabled: false
+      api_key: ${ANTHROPIC_API_KEY:- }
+      model: claude-3-opus
+
+# Tailscale Configuration (VPN)
+tailscale:
+  enabled: false
+  hostname: cortex
+  auth_key: ${TAILSCALE_AUTH_KEY:- }
+  tailnet: ${TAILSCALE_TAILNET:- }
+
+# Monitoring & Telemetry
+monitoring:
+  enabled: false
+  # OpenTelemetry configuration
+  otel_enabled: false
+  otel_endpoint: http://localhost:4317
+  
+  # Prometheus metrics
+  metrics_enabled: false
+  metrics_port: 9090
+
+# Organization Info
+organization:
+  name: AetherAssembly
+  website: https://cortex.aetherassembly.org
+  repository: https://github.com/aetherassembly/Cortex
+  support_email: support@aetherassembly.org
+  contact_email: contact@aetherassembly.org
+  license: MIT
+
+################################################################################
+# Environment-Specific Overrides
+# These can be overridden by creating config.{env}.yaml files
+################################################################################
+
+# Example Production Configuration:
+# config.production.yaml
+# ---
+# app:
+#   env: production
+#   debug: false
+# backend:
+#   workers: 8
+#   log_level: WARNING
+# database:
+#   url: postgresql://cortex:${DB_PASSWORD}@db.aetherassembly.org:5432/cortex_prod
+# security:
+#   cors:
+#     origins:
+#       - https://cortex.aetherassembly.org
+# discord:
+#   enabled: true
+# email:
+#   enabled: true
+# models:
+#   providers:
+#     openai:
+#       enabled: true
+
+################################################################################
+# Local Configuration
+# Create config.local.yaml to override settings without committing
+# This is gitignored and only used locally
+################################################################################

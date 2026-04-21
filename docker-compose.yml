@@ -1,0 +1,154 @@
+# Source: NEW - Cortex Docker Compose Configuration
+# CORTEX MODIFICATION: Multi-container orchestration for development and production
+
+version: "3.8"
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:14-alpine
+    container_name: cortex-postgres
+    environment:
+      POSTGRES_USER: cortex
+      POSTGRES_PASSWORD: cortex_secure_password
+      POSTGRES_DB: cortex_db
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cortex"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cortex-network
+    restart: unless-stopped
+
+  # Backend API Server
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cortex-backend
+    environment:
+      # Database
+      DATABASE_URL: postgresql://cortex:cortex_secure_password@postgres:5432/cortex_db
+      
+      # API Settings
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+      API_WORKERS: 4
+      
+      # Security
+      SECRET_KEY: your-secret-key-change-in-production
+      CORS_ORIGINS: http://localhost:5173,http://localhost:3000,http://localhost
+      
+      # Logging
+      LOG_LEVEL: DEBUG
+      
+      # Discord (optional)
+      DISCORD_TOKEN: ${DISCORD_TOKEN:-}
+      
+      # Tailscale (optional)
+      TAILSCALE_API_KEY: ${TAILSCALE_API_KEY:-}
+      TAILSCALE_TAILNET: ${TAILSCALE_TAILNET:-}
+    
+    ports:
+      - "8000:8000"
+    
+    volumes:
+      - ./backend:/app
+      - cortex_logs:/var/log/cortex
+    
+    depends_on:
+      postgres:
+        condition: service_healthy
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    
+    networks:
+      - cortex-network
+    
+    restart: unless-stopped
+
+  # Frontend Web Application
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cortex-frontend
+    environment:
+      VITE_API_URL: http://localhost:8000/api
+      VITE_WS_URL: ws://localhost:8000/ws
+      VITE_ENV: development
+    
+    ports:
+      - "5173:5173"
+    
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    
+    depends_on:
+      - backend
+    
+    networks:
+      - cortex-network
+    
+    restart: unless-stopped
+
+  # Redis Cache (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: cortex-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cortex-network
+    restart: unless-stopped
+    profiles:
+      - cache
+
+  # Nginx Reverse Proxy (optional)
+  nginx:
+    image: nginx:alpine
+    container_name: cortex-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - cortex-network
+    restart: unless-stopped
+    profiles:
+      - proxy
+
+networks:
+  cortex-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  cortex_logs:
+    driver: local

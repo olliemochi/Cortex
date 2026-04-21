@@ -1,0 +1,66 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+venv/
+__pycache__/
+*.egg-info/
+
+# Build outputs
+build/
+dist/
+.next/
+.nuxt/
+.cache/
+.vuepress/dist/
+.serverless/
+.fusebox/
+.dynamodb/
+.tern-port
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.iml
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Runtime
+*.pid
+*.seed
+*.pid.lock
+tmp/
+temp/
+
+# Docker
+.dockerignore
+
+# Tailscale
+.tailscale/
+
+# Memory & state
+memory/*.md
+!memory/MEMORY.md.example
+!memory/DREAMS.md.example
+
+# Data
+data/
+database.db
+
+# Development
+dev-docs/

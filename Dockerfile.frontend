@@ -1,0 +1,28 @@
+# Cortex Frontend Dockerfile
+# Part of the Cortex AI Agent Platform
+# Organization: AetherAssembly
+# License: MIT
+
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY frontend/package*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy source
+COPY frontend/src ./src
+COPY frontend/*.config.* ./
+COPY frontend/*.json ./
+
+# Build
+RUN npm run build
+
+# Expose port
+EXPOSE 3000
+
+# Start
+CMD ["npm", "run", "preview"]
