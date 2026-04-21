@@ -87,11 +87,11 @@ See [CORTEX_HEALTH_REPORT.md](./CORTEX_HEALTH_REPORT.md) for complete audit resu
 - Docker & Docker Compose (recommended)
 - Or: Node.js 18+, Python 3.10+, PostgreSQL 12+
 
-### 5-Minute Setup
+### Option 1: Docker Compose
 
 ```bash
 # Clone repository
-cd /home/aster/Documents/Cortex-Project
+cd /home/aster/Documents/Cortex-Project/cortex
 
 # Start with Docker Compose
 docker-compose up -d
@@ -100,6 +100,41 @@ docker-compose up -d
 # Frontend: http://localhost:5173
 # Backend API: http://localhost:8000
 # API Docs: http://localhost:8000/docs
+```
+
+### Option 2: System-Wide Installation (Linux)
+
+Install Cortex as a system application with desktop launcher:
+
+```bash
+# Clone repository
+cd /home/aster/Documents/Cortex-Project
+
+# Install system-wide (requires sudo)
+sudo bash cortex/install-app.sh
+
+# Launch from anywhere
+cortex-launcher
+```
+
+This installs:
+- ✅ Application to `/opt/cortex`
+- ✅ Launcher command: `cortex-launcher`
+- ✅ Desktop application entry
+- ✅ Shell completions (bash, zsh, fish)
+- ✅ Uninstall script: `cortex-uninstall`
+
+### Option 3: Manual Development
+
+```bash
+# Clone repository
+cd /home/aster/Documents/Cortex-Project/cortex
+
+# Setup virtual environment
+bash setup-venv.sh
+
+# Start development servers
+bash scripts/dev.sh
 ```
 
 See [QUICK_START.md](QUICK_START.md) for detailed instructions.
@@ -114,9 +149,80 @@ See [QUICK_START.md](QUICK_START.md) for detailed instructions.
 - **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** - Production deployment
 - **[PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)** - Project overview
 
+### Quick Reference: Installation Methods
+
+**Docker Compose** (Recommended)
+```bash
+docker-compose up -d
+```
+
+**System-Wide (Linux)**
+```bash
+sudo bash install-app.sh
+cortex-launcher  # Launch from anywhere
+```
+
+**Manual Development**
+```bash
+bash setup-venv.sh
+bash scripts/dev.sh
+```
+
 ---
 
-## 🏗️ Architecture
+## 🔧 System Installation (Linux)
+
+### Install as System Application
+
+```bash
+sudo bash install-app.sh
+```
+
+This installation method is perfect for end users who want Cortex as a system application.
+
+**What Gets Installed:**
+
+| Component | Location |
+|-----------|----------|
+| Application Files | `/opt/cortex` |
+| Launcher Command | `/usr/local/bin/cortex-launcher` |
+| Desktop Entry | `/usr/local/share/applications/cortex.desktop` |
+| Application Icon | `/usr/local/share/icons/hicolor/256x256/apps/cortex.svg` |
+| Shell Completions | `/etc/bash_completion.d/`, `/usr/share/zsh/`, `/usr/share/fish/` |
+| Uninstall Script | `/usr/local/bin/cortex-uninstall` |
+
+**Features:**
+
+- ✅ Desktop application launcher (search for "Cortex" in your app menu)
+- ✅ Command-line launcher: `cortex-launcher`
+- ✅ Shell auto-completion for bash, zsh, and fish
+- ✅ One-command uninstall: `cortex-uninstall` (requires sudo)
+
+**Requirements:**
+
+- Linux-based operating system
+- Root/sudo access
+- Bash shell
+
+### Launching Cortex
+
+After installation, launch via:
+
+```bash
+# From command line
+cortex-launcher
+
+# From desktop (search for "Cortex" in app menu)
+# Click the Cortex application icon
+```
+
+### Uninstalling
+
+```bash
+sudo cortex-uninstall
+```
+
+---
 
 ### Technology Stack
 
