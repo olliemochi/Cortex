@@ -64,3 +64,4 @@ database.db
 
 # Development
 dev-docs/
+pylint_report.txt

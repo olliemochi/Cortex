@@ -1,3 +1,4 @@
+"""Analytics router for Cortex."""
 from typing import Optional
 from datetime import datetime, timedelta
 from collections import defaultdict
@@ -7,7 +8,6 @@ from pydantic import BaseModel
 
 from open_webui.models.chat_messages import ChatMessages, ChatMessageModel
 from open_webui.models.chats import Chats
-from open_webui.models.groups import Groups
 from open_webui.models.users import Users
 from open_webui.models.feedbacks import Feedbacks
 from open_webui.utils.auth import get_admin_user
@@ -25,16 +25,22 @@ router = APIRouter()
 ####################
 
 
-class ModelAnalyticsEntry(BaseModel):
+class ModelAnalyticsEntry(BaseModel):  # pylint: disable=too-few-public-methods
+    """Analytics entry for a single model."""
+
     model_id: str
     count: int
 
 
-class ModelAnalyticsResponse(BaseModel):
+class ModelAnalyticsResponse(BaseModel):  # pylint: disable=too-few-public-methods
+    """Response containing analytics per model."""
+
     models: list[ModelAnalyticsEntry]
 
 
-class UserAnalyticsEntry(BaseModel):
+class UserAnalyticsEntry(BaseModel):  # pylint: disable=too-few-public-methods
+    """Analytics entry for a single user."""
+
     user_id: str
     name: Optional[str] = None
     email: Optional[str] = None
@@ -44,7 +50,9 @@ class UserAnalyticsEntry(BaseModel):
     total_tokens: int = 0
 
 
-class UserAnalyticsResponse(BaseModel):
+class UserAnalyticsResponse(BaseModel):  # pylint: disable=too-few-public-methods
+    """Response containing analytics per user."""
+
     users: list[UserAnalyticsEntry]
 
 
@@ -54,7 +62,7 @@ class UserAnalyticsResponse(BaseModel):
 
 
 @router.get('/models', response_model=ModelAnalyticsResponse)
-async def get_model_analytics(
+async def get_model_analytics(  # pylint: disable=too-many-arguments,too-many-positional-arguments,unused-argument
     start_date: Optional[int] = Query(None, description='Start timestamp (epoch)'),
     end_date: Optional[int] = Query(None, description='End timestamp (epoch)'),
     group_id: Optional[str] = Query(None, description='Filter by user group ID'),
@@ -62,7 +70,9 @@ async def get_model_analytics(
     db: Session = Depends(get_session),
 ):
     """Get message counts per model."""
-    counts = ChatMessages.get_message_count_by_model(start_date=start_date, end_date=end_date, group_id=group_id, db=db)
+    counts = ChatMessages.get_message_count_by_model(
+        start_date=start_date, end_date=end_date, group_id=group_id, db=db
+    )
     models = [
         ModelAnalyticsEntry(model_id=model_id, count=count)
         for model_id, count in sorted(counts.items(), key=lambda x: -x[1])
@@ -71,7 +81,7 @@ async def get_model_analytics(
 
 
 @router.get('/users', response_model=UserAnalyticsResponse)
-async def get_user_analytics(
+async def get_user_analytics(  # pylint: disable=too-many-arguments,too-many-positional-arguments,unused-argument
     start_date: Optional[int] = Query(None, description='Start timestamp (epoch)'),
     end_date: Optional[int] = Query(None, description='End timestamp (epoch)'),
     group_id: Optional[str] = Query(None, description='Filter by user group ID'),
@@ -80,7 +90,9 @@ async def get_user_analytics(
     db: Session = Depends(get_session),
 ):
     """Get message counts and token usage per user with user info."""
-    counts = ChatMessages.get_message_count_by_user(start_date=start_date, end_date=end_date, group_id=group_id, db=db)
+    counts = ChatMessages.get_message_count_by_user(
+        start_date=start_date, end_date=end_date, group_id=group_id, db=db
+    )
     token_usage = ChatMessages.get_token_usage_by_user(
         start_date=start_date, end_date=end_date, group_id=group_id, db=db
     )
@@ -109,7 +121,7 @@ async def get_user_analytics(
 
 
 @router.get('/messages', response_model=list[ChatMessageModel])
-async def get_messages(
+async def get_messages(  # pylint: disable=too-many-arguments,too-many-positional-arguments,unused-argument
     model_id: Optional[str] = Query(None, description='Filter by model ID'),
     user_id: Optional[str] = Query(None, description='Filter by user ID'),
     chat_id: Optional[str] = Query(None, description='Filter by chat ID'),
@@ -123,7 +135,7 @@ async def get_messages(
     """Query messages with filters."""
     if chat_id:
         return ChatMessages.get_messages_by_chat_id(chat_id=chat_id, db=db)
-    elif model_id:
+    if model_id:
         return ChatMessages.get_messages_by_model_id(
             model_id=model_id,
             start_date=start_date,
@@ -132,14 +144,15 @@ async def get_messages(
             limit=limit,
             db=db,
         )
-    elif user_id:
+    if user_id:
         return ChatMessages.get_messages_by_user_id(user_id=user_id, skip=skip, limit=limit, db=db)
-    else:
-        # Return empty if no filter specified
-        return []
+    # Return empty if no filter specified
+    return []
 
 
-class SummaryResponse(BaseModel):
+class SummaryResponse(BaseModel):  # pylint: disable=too-few-public-methods
+    """Summary statistics response."""
+
     total_messages: int
     total_chats: int
     total_models: int
@@ -147,7 +160,7 @@ class SummaryResponse(BaseModel):
 
 
 @router.get('/summary', response_model=SummaryResponse)
-async def get_summary(
+async def get_summary(  # pylint: disable=too-many-arguments,too-many-positional-arguments,unused-argument
     start_date: Optional[int] = Query(None, description='Start timestamp (epoch)'),
     end_date: Optional[int] = Query(None, description='End timestamp (epoch)'),
     group_id: Optional[str] = Query(None, description='Filter by user group ID'),
@@ -173,17 +186,21 @@ async def get_summary(
     )
 
 
-class DailyStatsEntry(BaseModel):
+class DailyStatsEntry(BaseModel):  # pylint: disable=too-few-public-methods
+    """Daily statistics entry."""
+
     date: str
     models: dict[str, int]
 
 
-class DailyStatsResponse(BaseModel):
+class DailyStatsResponse(BaseModel):  # pylint: disable=too-few-public-methods
+    """Response containing daily stats."""
+
     data: list[DailyStatsEntry]
 
 
 @router.get('/daily', response_model=DailyStatsResponse)
-async def get_daily_stats(
+async def get_daily_stats(  # pylint: disable=too-many-arguments,too-many-positional-arguments,unused-argument
     start_date: Optional[int] = Query(None, description='Start timestamp (epoch)'),
     end_date: Optional[int] = Query(None, description='End timestamp (epoch)'),
     group_id: Optional[str] = Query(None, description='Filter by user group ID'),
@@ -193,7 +210,9 @@ async def get_daily_stats(
 ):
     """Get message counts grouped by model for time-series chart."""
     if granularity == 'hourly':
-        counts = ChatMessages.get_hourly_message_counts_by_model(start_date=start_date, end_date=end_date, db=db)
+        counts = ChatMessages.get_hourly_message_counts_by_model(
+            start_date=start_date, end_date=end_date, db=db
+        )
     else:
         counts = ChatMessages.get_daily_message_counts_by_model(
             start_date=start_date, end_date=end_date, group_id=group_id, db=db
@@ -203,7 +222,9 @@ async def get_daily_stats(
     )
 
 
-class TokenUsageEntry(BaseModel):
+class TokenUsageEntry(BaseModel):  # pylint: disable=too-few-public-methods
+    """Token usage entry for a single model."""
+
     model_id: str
     input_tokens: int
     output_tokens: int
@@ -211,7 +232,9 @@ class TokenUsageEntry(BaseModel):
     message_count: int
 
 
-class TokenUsageResponse(BaseModel):
+class TokenUsageResponse(BaseModel):  # pylint: disable=too-few-public-methods
+    """Response containing token usage."""
+
     models: list[TokenUsageEntry]
     total_input_tokens: int
     total_output_tokens: int
@@ -219,7 +242,7 @@ class TokenUsageResponse(BaseModel):
 
 
 @router.get('/tokens', response_model=TokenUsageResponse)
-async def get_token_usage(
+async def get_token_usage(  # pylint: disable=unused-argument
     start_date: Optional[int] = Query(None),
     end_date: Optional[int] = Query(None),
     group_id: Optional[str] = Query(None, description='Filter by user group ID'),
@@ -227,7 +250,9 @@ async def get_token_usage(
     db: Session = Depends(get_session),
 ):
     """Get token usage aggregated by model."""
-    usage = ChatMessages.get_token_usage_by_model(start_date=start_date, end_date=end_date, group_id=group_id, db=db)
+    usage = ChatMessages.get_token_usage_by_model(
+        start_date=start_date, end_date=end_date, group_id=group_id, db=db
+    )
 
     models = [
         TokenUsageEntry(model_id=model_id, **data)
@@ -250,7 +275,9 @@ async def get_token_usage(
 ####################
 
 
-class ModelChatEntry(BaseModel):
+class ModelChatEntry(BaseModel):  # pylint: disable=too-few-public-methods
+    """Chat entry for a model chats browser result."""
+
     chat_id: str
     user_id: Optional[str] = None
     user_name: Optional[str] = None
@@ -258,13 +285,15 @@ class ModelChatEntry(BaseModel):
     updated_at: int
 
 
-class ModelChatsResponse(BaseModel):
+class ModelChatsResponse(BaseModel):  # pylint: disable=too-few-public-methods
+    """Response containing model chats."""
+
     chats: list[ModelChatEntry]
     total: int
 
 
 @router.get('/models/{model_id:path}/chats', response_model=ModelChatsResponse)
-async def get_model_chats(
+async def get_model_chats(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,unused-argument
     model_id: str,
     start_date: Optional[int] = Query(None),
     end_date: Optional[int] = Query(None),
@@ -336,24 +365,30 @@ async def get_model_chats(
 ####################
 
 
-class HistoryEntry(BaseModel):
+class HistoryEntry(BaseModel):  # pylint: disable=too-few-public-methods
+    """Feedback history entry per day."""
+
     date: str
     won: int = 0
     lost: int = 0
 
 
-class TagEntry(BaseModel):
+class TagEntry(BaseModel):  # pylint: disable=too-few-public-methods
+    """Tag frequency entry."""
+
     tag: str
     count: int
 
 
-class ModelOverviewResponse(BaseModel):
+class ModelOverviewResponse(BaseModel):  # pylint: disable=too-few-public-methods
+    """Overview response for a specific model."""
+
     history: list[HistoryEntry]
     tags: list[TagEntry]
 
 
 @router.get('/models/{model_id:path}/overview', response_model=ModelOverviewResponse)
-async def get_model_overview(
+async def get_model_overview(  # pylint: disable=too-many-locals,too-many-branches,unused-argument
     model_id: str,
     days: int = Query(30, description='Number of days of history (0 for all)'),
     user=Depends(get_admin_user),
@@ -431,6 +466,9 @@ async def get_model_overview(
                 tag_counts[tag] += 1
 
     # Sort by count and take top 10
-    tags = [TagEntry(tag=tag, count=count) for tag, count in sorted(tag_counts.items(), key=lambda x: -x[1])[:10]]
+    tags = [
+        TagEntry(tag=tag, count=count)
+        for tag, count in sorted(tag_counts.items(), key=lambda x: -x[1])[:10]
+    ]
 
     return ModelOverviewResponse(history=history, tags=tags)

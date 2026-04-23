@@ -1,14 +1,14 @@
 # Source: NEW - Cortex Discord Bot Module
 # CORTEX MODIFICATION: Discord bot integration for Cortex agent
+"""Discord bot integration for Cortex AI agent."""
 
-import os
-import asyncio
-from typing import Optional, Dict, List, Any
+from typing import Dict, List, Any
 from datetime import datetime
 import logging
 
-import discord
-from discord.ext import commands, tasks
+import aiohttp  # pylint: disable=import-error
+import discord  # pylint: disable=import-error
+from discord.ext import commands, tasks  # pylint: disable=import-error
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class CortexDiscordBot(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         """Called when bot connects to Discord"""
-        logger.info(f"Cortex bot logged in as {self.bot.user}")
+        logger.info("Cortex bot logged in as %s", self.bot.user)
         await self.update_activity()
         self.heartbeat_loop.start()
 
@@ -43,9 +43,11 @@ class CortexDiscordBot(commands.Cog):
 
         # Log activity
         self._log_activity(
-            type="message",
+            activity_type="message",
             guild=message.guild.name if message.guild else "DM",
-            channel=message.channel.name if hasattr(message.channel, "name") else "DM",
+            channel=(
+                message.channel.name if hasattr(message.channel, "name") else "DM"
+            ),
             user=message.author.name,
             action="Message received",
             details=message.content[:100],
@@ -61,9 +63,13 @@ class CortexDiscordBot(commands.Cog):
             return
 
         self._log_activity(
-            type="reaction",
+            activity_type="reaction",
             guild=reaction.message.guild.name if reaction.message.guild else "DM",
-            channel=reaction.message.channel.name if hasattr(reaction.message.channel, "name") else "DM",
+            channel=(
+                reaction.message.channel.name
+                if hasattr(reaction.message.channel, "name")
+                else "DM"
+            ),
             user=user.name,
             action="Reaction added",
             details=f"Emoji: {reaction.emoji}",
@@ -74,8 +80,8 @@ class CortexDiscordBot(commands.Cog):
         """Periodic heartbeat for health checks"""
         try:
             await self.update_activity()
-        except Exception as e:
-            logger.error(f"Heartbeat error: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Heartbeat error: %s", e)
 
     async def update_activity(self):
         """Update bot activity status"""
@@ -86,8 +92,8 @@ class CortexDiscordBot(commands.Cog):
                     name="Cortex dreams | /help for commands"
                 )
             )
-        except Exception as e:
-            logger.error(f"Failed to update activity: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Failed to update activity: %s", e)
 
     async def process_cortex_command(self, message: discord.Message):
         """Process Cortex slash command"""
@@ -112,10 +118,12 @@ class CortexDiscordBot(commands.Cog):
             elif command == "help":
                 await self.handle_help(message)
             else:
-                await message.reply(f"Unknown command: /{command}. Use `/help` for available commands.")
+                await message.reply(
+                    f"Unknown command: /{command}. Use `/help` for available commands."
+                )
 
-        except Exception as e:
-            logger.error(f"Error processing command: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Error processing command: %s", e)
             await message.reply(f"Error processing command: {str(e)}")
 
     async def handle_chat(self, message: discord.Message, query: str):
@@ -128,8 +136,6 @@ class CortexDiscordBot(commands.Cog):
             # Show typing indicator
             async with message.channel.typing():
                 # Send to Cortex API
-                import aiohttp
-
                 async with aiohttp.ClientSession() as session:
                     async with session.post(
                         f"{self.api_url}/chat/message",
@@ -145,22 +151,22 @@ class CortexDiscordBot(commands.Cog):
                                 await message.reply(f"Error: {data.get('error', 'Unknown error')}")
                         else:
                             await message.reply(f"API error: {resp.status}")
-        except Exception as e:
-            logger.error(f"Chat error: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Chat error: %s", e)
             await message.reply(f"Failed to get response: {str(e)}")
 
-    async def handle_memory(self, message: discord.Message, args: str):
+    async def handle_memory(  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
+        self, message: discord.Message, args: str
+    ):
         """Handle /memory command"""
         if not args:
             await message.reply("Usage: `/memory add|search|list [args]`")
             return
 
-        try:
+        try:  # pylint: disable=too-many-branches
             parts = args.split(maxsplit=1)
             action = parts[0]
             data = parts[1] if len(parts) > 1 else ""
-
-            import aiohttp
 
             async with aiohttp.ClientSession() as session:
                 if action == "add":
@@ -200,7 +206,9 @@ class CortexDiscordBot(commands.Cog):
                                 if memories:
                                     response = "Found memories:\n"
                                     for mem in memories:
-                                        response += f"- {mem.get('title')}: {mem.get('content')[:50]}...\n"
+                                        title = mem.get('title')
+                                        preview = mem.get('content', '')[:50]
+                                        response += f"- {title}: {preview}...\n"
                                     await self.send_long_message(message, response)
                                 else:
                                     await message.reply("No memories found")
@@ -217,20 +225,20 @@ class CortexDiscordBot(commands.Cog):
                                 if memories:
                                     response = "Recent memories:\n"
                                     for mem in memories[:5]:
-                                        response += f"- [{mem.get('category')}] {mem.get('title')}\n"
+                                        cat = mem.get('category')
+                                        title = mem.get('title')
+                                        response += f"- [{cat}] {title}\n"
                                     await self.send_long_message(message, response)
                                 else:
                                     await message.reply("No memories stored")
 
-        except Exception as e:
-            logger.error(f"Memory command error: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Memory command error: %s", e)
             await message.reply(f"Error: {str(e)}")
 
     async def handle_status(self, message: discord.Message):
         """Handle /status command"""
         try:
-            import aiohttp
-
             async with aiohttp.ClientSession() as session:
                 async with session.get(f"{self.api_url}/chat/context") as resp:
                     if resp.status == 200:
@@ -246,33 +254,37 @@ Discord: ✓ Connected
 Available Tools: {', '.join(ctx.get('available_tools', []))}
 """
                             await message.reply(status_text)
-        except Exception as e:
-            logger.error(f"Status error: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Status error: %s", e)
             await message.reply(f"Failed to get status: {str(e)}")
 
     async def handle_dream(self, message: discord.Message):
         """Handle /dream command"""
         try:
-            import aiohttp
-
             async with aiohttp.ClientSession() as session:
                 async with session.post(f"{self.api_url}/dreaming/run") as resp:
                     if resp.status == 200:
                         data = await resp.json()
                         if data.get("status") == "ok":
-                            await message.reply("💭 Dream cycle started. Agent is consolidating memories...")
+                            await message.reply(
+                                "💭 Dream cycle started. Agent is consolidating memories..."
+                            )
                             self._log_activity(
-                                type="dream",
+                                activity_type="dream",
                                 guild=message.guild.name if message.guild else "DM",
-                                channel=message.channel.name if hasattr(message.channel, "name") else "DM",
+                                channel=(
+                                    message.channel.name
+                                    if hasattr(message.channel, "name")
+                                    else "DM"
+                                ),
                                 user=message.author.name,
                                 action="Dream cycle initiated",
                                 details="Manual trigger",
                             )
                         else:
                             await message.reply(f"Error: {data.get('error')}")
-        except Exception as e:
-            logger.error(f"Dream error: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Dream error: %s", e)
             await message.reply(f"Failed to start dream: {str(e)}")
 
     async def handle_help(self, message: discord.Message):
@@ -295,7 +307,9 @@ Available Tools: {', '.join(ctx.get('available_tools', []))}
 """
         await message.reply(help_text)
 
-    async def send_long_message(self, message: discord.Message, content: str, max_length: int = 2000):
+    async def send_long_message(
+        self, message: discord.Message, content: str, max_length: int = 2000
+    ):
         """Send message, splitting if needed"""
         if len(content) <= max_length:
             await message.reply(content)
@@ -305,19 +319,19 @@ Available Tools: {', '.join(ctx.get('available_tools', []))}
             for chunk in chunks:
                 await message.reply(chunk)
 
-    def _log_activity(
+    def _log_activity(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        type: str,
+        activity_type: str,
         guild: str,
         channel: str,
         user: str,
         action: str,
         details: str = "",
     ):
-        """Log Discord activity"""
+        """Log Discord activity."""
         entry = {
             "timestamp": datetime.utcnow().isoformat(),
-            "type": type,
+            "type": activity_type,
             "guild": guild,
             "channel": channel,
             "user": user,
@@ -330,7 +344,7 @@ Available Tools: {', '.join(ctx.get('available_tools', []))}
         if len(self.activity_log) > self.max_log_size:
             self.activity_log = self.activity_log[-self.max_log_size :]
 
-        logger.info(f"Discord Activity: {action} - {user} in {channel}")
+        logger.info("Discord Activity: %s - %s in %s", action, user, channel)
 
     def get_activity_log(self, limit: int = 20) -> List[Dict[str, Any]]:
         """Get activity log"""
@@ -342,7 +356,10 @@ Available Tools: {', '.join(ctx.get('available_tools', []))}
         await ctx.send(f"Pong! {round(self.bot.latency * 1000)}ms")
 
 
-async def setup_discord_bot(token: str, cortex_api_url: str = "http://localhost:8000/api"):
+async def setup_discord_bot(
+    token: str,  # pylint: disable=unused-argument
+    cortex_api_url: str = "http://localhost:8000/api",
+):
     """Initialize and start Discord bot"""
     intents = discord.Intents.default()
     intents.message_content = True

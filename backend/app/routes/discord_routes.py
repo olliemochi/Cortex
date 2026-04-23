@@ -1,21 +1,25 @@
 # Source: NEW - Discord Integration Endpoints
 # CORTEX MODIFICATION: REST API endpoints for Discord bot management
+"""REST API endpoints for Discord bot management."""
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
-from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
 import logging
+from typing import Optional
+
+from fastapi import APIRouter, BackgroundTasks
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/discord", tags=["discord"])
 
 # Global Discord bot instance (will be set during app initialization)
-discord_bot_instance = None
-discord_cog_instance = None
+discord_bot_instance = None  # pylint: disable=invalid-name
+discord_cog_instance = None  # pylint: disable=invalid-name
 
 
-class DiscordConfig(BaseModel):
+class DiscordConfig(BaseModel):  # pylint: disable=too-few-public-methods
+    """Discord bot configuration."""
+
     token: str
     api_url: Optional[str] = "http://localhost:8000/api"
 
@@ -34,12 +38,14 @@ async def get_discord_status():
                 },
             }
 
-        from app.integrations.discord_bot import get_discord_status
+        from app.integrations.discord_bot import (  # pylint: disable=import-outside-toplevel,import-error
+            get_discord_status as _get_discord_status,
+        )
 
-        status = get_discord_status(discord_bot_instance)
+        status = _get_discord_status(discord_bot_instance)
         return {"status": "ok", "data": status}
-    except Exception as e:
-        logger.error(f"Error getting Discord status: {e}")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Error getting Discord status: %s", e)
         return {
             "status": "error",
             "error": str(e),
@@ -52,7 +58,7 @@ async def test_discord_connection():
     """Test Discord bot connection"""
     try:
         if not discord_bot_instance:
-            raise Exception("Discord bot not initialized")
+            raise RuntimeError("Discord bot not initialized")
 
         # Test by checking if bot is ready
         is_ready = discord_bot_instance.is_ready()
@@ -66,8 +72,8 @@ async def test_discord_connection():
                 "latency_ms": round(latency * 1000),
             },
         }
-    except Exception as e:
-        logger.error(f"Error testing Discord connection: {e}")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Error testing Discord connection: %s", e)
         return {
             "status": "error",
             "error": str(e),
@@ -79,7 +85,7 @@ async def test_discord_connection():
 async def start_discord_bot(config: DiscordConfig, background_tasks: BackgroundTasks):
     """Start Discord bot"""
     try:
-        global discord_bot_instance, discord_cog_instance
+        global discord_bot_instance, discord_cog_instance  # pylint: disable=global-statement
 
         if discord_bot_instance and discord_bot_instance.is_ready():
             return {
@@ -87,7 +93,9 @@ async def start_discord_bot(config: DiscordConfig, background_tasks: BackgroundT
                 "data": {"message": "Bot already running"},
             }
 
-        from app.integrations.discord_bot import setup_discord_bot
+        from app.integrations.discord_bot import (  # pylint: disable=import-outside-toplevel,import-error
+            setup_discord_bot,
+        )
 
         bot, cog = await setup_discord_bot(config.token, config.api_url)
         discord_bot_instance = bot
@@ -100,8 +108,8 @@ async def start_discord_bot(config: DiscordConfig, background_tasks: BackgroundT
             "status": "ok",
             "data": {"message": "Discord bot starting"},
         }
-    except Exception as e:
-        logger.error(f"Error starting Discord bot: {e}")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Error starting Discord bot: %s", e)
         return {
             "status": "error",
             "error": str(e),
@@ -112,7 +120,7 @@ async def start_discord_bot(config: DiscordConfig, background_tasks: BackgroundT
 async def stop_discord_bot():
     """Stop Discord bot"""
     try:
-        global discord_bot_instance
+        global discord_bot_instance  # pylint: disable=global-statement
 
         if not discord_bot_instance:
             return {
@@ -127,8 +135,8 @@ async def stop_discord_bot():
             "status": "ok",
             "data": {"message": "Discord bot stopped"},
         }
-    except Exception as e:
-        logger.error(f"Error stopping Discord bot: {e}")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Error stopping Discord bot: %s", e)
         return {
             "status": "error",
             "error": str(e),
@@ -151,8 +159,8 @@ async def get_discord_activity(limit: int = 20):
             "data": activity,
             "total": len(activity),
         }
-    except Exception as e:
-        logger.error(f"Error getting activity log: {e}")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Error getting activity log: %s", e)
         return {
             "status": "error",
             "error": str(e),
@@ -161,7 +169,7 @@ async def get_discord_activity(limit: int = 20):
 
 
 def set_discord_instances(bot, cog):
-    """Set global Discord bot instances"""
-    global discord_bot_instance, discord_cog_instance
+    """Set global Discord bot instances."""
+    global discord_bot_instance, discord_cog_instance  # pylint: disable=global-statement
     discord_bot_instance = bot
     discord_cog_instance = cog

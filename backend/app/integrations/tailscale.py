@@ -1,14 +1,15 @@
 # Source: NEW - Cortex Tailscale Integration
 # CORTEX MODIFICATION: Tailscale network integration for secure remote access
+"""Tailscale network integration for Cortex."""
 
 import os
 import json
 import logging
-import subprocess
+import asyncio
 from typing import Optional, Dict, List, Any
 from dataclasses import dataclass
-from datetime import datetime
-import asyncio
+
+import aiohttp  # pylint: disable=import-error
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +55,8 @@ class TailscaleClient:
                 data = json.loads(result)
                 self._status = self._parse_status(data)
                 return self._status
-        except Exception as e:
-            logger.error(f"Error getting Tailscale status: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Error getting Tailscale status: %s", e)
         return None
 
     async def connect(self) -> bool:
@@ -64,8 +65,8 @@ class TailscaleClient:
             await self._run_command(["tailscale", "up"])
             logger.info("Connected to Tailscale")
             return True
-        except Exception as e:
-            logger.error(f"Error connecting to Tailscale: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Error connecting to Tailscale: %s", e)
             return False
 
     async def disconnect(self) -> bool:
@@ -74,8 +75,8 @@ class TailscaleClient:
             await self._run_command(["tailscale", "down"])
             logger.info("Disconnected from Tailscale")
             return True
-        except Exception as e:
-            logger.error(f"Error disconnecting from Tailscale: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Error disconnecting from Tailscale: %s", e)
             return False
 
     async def get_peers(self) -> List[Dict[str, Any]]:
@@ -93,8 +94,8 @@ class TailscaleClient:
                     }
                     for peer in status.peers
                 ]
-        except Exception as e:
-            logger.error(f"Error getting peers: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Error getting peers: %s", e)
         return []
 
     async def enable_device_sharing(self, device_name: str) -> bool:
@@ -103,10 +104,10 @@ class TailscaleClient:
             await self._run_command(
                 ["tailscale", "share", "enable", device_name]
             )
-            logger.info(f"Device sharing enabled: {device_name}")
+            logger.info("Device sharing enabled: %s", device_name)
             return True
-        except Exception as e:
-            logger.error(f"Error enabling device sharing: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Error enabling device sharing: %s", e)
             return False
 
     async def disable_device_sharing(self, device_name: str) -> bool:
@@ -115,14 +116,14 @@ class TailscaleClient:
             await self._run_command(
                 ["tailscale", "share", "disable", device_name]
             )
-            logger.info(f"Device sharing disabled: {device_name}")
+            logger.info("Device sharing disabled: %s", device_name)
             return True
-        except Exception as e:
-            logger.error(f"Error disabling device sharing: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Error disabling device sharing: %s", e)
             return False
 
     async def pair_device(
-        self, device_ip: str, timeout: int = 300
+        self, device_ip: str, timeout: int = 300  # pylint: disable=unused-argument
     ) -> Optional[str]:
         """Pair with another device on Tailscale network"""
         try:
@@ -133,10 +134,10 @@ class TailscaleClient:
             )
 
             if result:
-                logger.info(f"Successfully paired with device: {device_ip}")
+                logger.info("Successfully paired with device: %s", device_ip)
                 return device_ip
-        except Exception as e:
-            logger.error(f"Error pairing device: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Error pairing device: %s", e)
         return None
 
     async def list_devices(self) -> List[Dict[str, Any]]:
@@ -145,8 +146,6 @@ class TailscaleClient:
         try:
             if self.api_key and self.tailnet:
                 # Use API for more detailed information
-                import aiohttp
-
                 async with aiohttp.ClientSession() as session:
                     headers = {"Authorization": f"Bearer {self.api_key}"}
                     url = f"{self.base_url}/tailnet/{self.tailnet}/devices"
@@ -160,8 +159,8 @@ class TailscaleClient:
                 peers = await self.get_peers()
                 devices = peers
 
-        except Exception as e:
-            logger.error(f"Error listing devices: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Error listing devices: %s", e)
 
         return devices
 
@@ -169,8 +168,6 @@ class TailscaleClient:
         """Get details for specific device"""
         try:
             if self.api_key and self.tailnet:
-                import aiohttp
-
                 async with aiohttp.ClientSession() as session:
                     headers = {"Authorization": f"Bearer {self.api_key}"}
                     url = f"{self.base_url}/tailnet/{self.tailnet}/devices/{device_id}"
@@ -178,8 +175,8 @@ class TailscaleClient:
                     async with session.get(url, headers=headers) as resp:
                         if resp.status == 200:
                             return await resp.json()
-        except Exception as e:
-            logger.error(f"Error getting device details: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Error getting device details: %s", e)
 
         return None
 
@@ -187,18 +184,16 @@ class TailscaleClient:
         """Authorize device in Tailnet"""
         try:
             if self.api_key and self.tailnet:
-                import aiohttp
-
                 async with aiohttp.ClientSession() as session:
                     headers = {"Authorization": f"Bearer {self.api_key}"}
                     url = f"{self.base_url}/tailnet/{self.tailnet}/devices/{device_id}/authorize"
 
                     async with session.post(url, headers=headers) as resp:
                         if resp.status == 200:
-                            logger.info(f"Device authorized: {device_id}")
+                            logger.info("Device authorized: %s", device_id)
                             return True
-        except Exception as e:
-            logger.error(f"Error authorizing device: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Error authorizing device: %s", e)
 
         return False
 
@@ -206,18 +201,16 @@ class TailscaleClient:
         """Revoke device access"""
         try:
             if self.api_key and self.tailnet:
-                import aiohttp
-
                 async with aiohttp.ClientSession() as session:
                     headers = {"Authorization": f"Bearer {self.api_key}"}
                     url = f"{self.base_url}/tailnet/{self.tailnet}/devices/{device_id}"
 
                     async with session.delete(url, headers=headers) as resp:
                         if resp.status == 200:
-                            logger.info(f"Device revoked: {device_id}")
+                            logger.info("Device revoked: %s", device_id)
                             return True
-        except Exception as e:
-            logger.error(f"Error revoking device: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Error revoking device: %s", e)
 
         return False
 
@@ -225,9 +218,6 @@ class TailscaleClient:
         """Generate authentication key for device pairing"""
         try:
             if self.api_key and self.tailnet:
-                import aiohttp
-                import asyncio
-
                 async def _gen_key():
                     async with aiohttp.ClientSession() as session:
                         headers = {"Authorization": f"Bearer {self.api_key}"}
@@ -247,8 +237,8 @@ class TailscaleClient:
                     return None
 
                 return asyncio.run(_gen_key())
-        except Exception as e:
-            logger.error(f"Error generating auth key: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Error generating auth key: %s", e)
 
         return None
 
@@ -269,15 +259,14 @@ class TailscaleClient:
                 )
                 if process.returncode == 0:
                     return stdout.decode().strip()
-                else:
-                    error = stderr.decode().strip()
-                    logger.error(f"Command error: {error}")
+                error = stderr.decode().strip()
+                logger.error("Command error: %s", error)
             except asyncio.TimeoutError:
                 process.kill()
-                logger.error(f"Command timeout: {' '.join(command)}")
+                logger.error("Command timeout: %s", ' '.join(command))
 
-        except Exception as e:
-            logger.error(f"Error running command: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Error running command: %s", e)
 
         return None
 
@@ -303,14 +292,14 @@ class TailscaleClient:
                 tailnet=self.tailnet,
                 peers=peers,
             )
-        except Exception as e:
-            logger.error(f"Error parsing status: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("Error parsing status: %s", e)
             return None
 
 
 # API endpoints handler
 async def get_tailscale_status() -> Dict[str, Any]:
-    """Get Tailscale status"""
+    """Get Tailscale status."""
     client = TailscaleClient()
     status = await client.get_status()
 

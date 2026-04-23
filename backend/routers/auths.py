@@ -1,34 +1,29 @@
+"""Authentication routes for the Cortex API."""
+# pylint: disable=too-many-lines
 import asyncio
 import re
 import uuid
 import time
 import datetime
 import logging
-from aiohttp import ClientSession
 import urllib
+from typing import Optional
+from ssl import CERT_NONE, CERT_REQUIRED, PROTOCOL_TLS
+from aiohttp import ClientSession
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import Response, JSONResponse
+from ldap3 import Server, Connection, NONE, Tls
+from ldap3.utils.conv import escape_filter_chars
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
-
-from open_webui.models.auths import (
-    AddUserForm,
-    ApiKey,
-    Auths,
-    Token,
-    LdapForm,
-    SigninForm,
-    SigninResponse,
-    SignupForm,
-    UpdatePasswordForm,
+from open_webui.config import (
+    OPENID_PROVIDER_URL,
+    OPENID_END_SESSION_ENDPOINT,
+    ENABLE_PASSWORD_AUTH,
+    OAUTH_PROVIDERS,
+    OAUTH_MERGE_ACCOUNTS_BY_EMAIL,
 )
-from open_webui.models.users import (
-    UserModel,
-    UserProfileImageResponse,
-    Users,
-    UpdateProfileForm,
-    UserStatus,
-)
-from open_webui.models.groups import Groups
-from open_webui.models.oauth_sessions import OAuthSessions
-
 from open_webui.constants import ERROR_MESSAGES, WEBHOOK_MESSAGES
 from open_webui.env import (
     WEBUI_AUTH,
@@ -41,22 +36,29 @@ from open_webui.env import (
     WEBUI_AUTH_SIGNOUT_REDIRECT_URL,
     ENABLE_INITIAL_ADMIN_SIGNUP,
     ENABLE_OAUTH_TOKEN_EXCHANGE,
-    AIOHTTP_CLIENT_SESSION_SSL,
 )
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import RedirectResponse, Response, JSONResponse
-from open_webui.config import (
-    OPENID_PROVIDER_URL,
-    OPENID_END_SESSION_ENDPOINT,
-    ENABLE_OAUTH_SIGNUP,
-    ENABLE_LDAP,
-    ENABLE_PASSWORD_AUTH,
-    OAUTH_PROVIDERS,
-    OAUTH_MERGE_ACCOUNTS_BY_EMAIL,
+from open_webui.internal.db import get_session
+from open_webui.models.auths import (
+    AddUserForm,
+    ApiKey,
+    Auths,
+    Token,
+    LdapForm,
+    SigninForm,
+    SigninResponse,
+    SignupForm,
+    UpdatePasswordForm,
 )
-from pydantic import BaseModel
-
-from open_webui.utils.misc import parse_duration, validate_email_format
+from open_webui.models.groups import Groups
+from open_webui.models.oauth_sessions import OAuthSessions
+from open_webui.models.users import (
+    UserModel,
+    UserProfileImageResponse,
+    Users,
+    UpdateProfileForm,
+    UserStatus,
+)
+from open_webui.utils.access_control import get_permissions, has_permission
 from open_webui.utils.auth import (
     validate_password,
     verify_password,
@@ -70,22 +72,11 @@ from open_webui.utils.auth import (
     get_password_hash,
     get_http_authorization_cred,
 )
-from open_webui.internal.db import get_session
-from sqlalchemy.orm import Session
-from open_webui.utils.webhook import post_webhook
-from open_webui.utils.access_control import get_permissions, has_permission
 from open_webui.utils.groups import apply_default_group_assignment
-
-from open_webui.utils.redis import get_redis_client
+from open_webui.utils.misc import parse_duration, validate_email_format
 from open_webui.utils.rate_limit import RateLimiter
-
-
-from typing import Optional, List
-
-from ssl import CERT_NONE, CERT_REQUIRED, PROTOCOL_TLS
-
-from ldap3 import Server, Connection, NONE, Tls
-from ldap3.utils.conv import escape_filter_chars
+from open_webui.utils.redis import get_redis_client
+from open_webui.utils.webhook import post_webhook
 
 router = APIRouter()
 
@@ -96,7 +87,9 @@ log = logging.getLogger(__name__)
 signin_rate_limiter = RateLimiter(redis_client=get_redis_client(), limit=5 * 3, window=60 * 3)
 
 
-def create_session_response(request: Request, user, db, response: Response = None, set_cookie: bool = False) -> dict:
+def create_session_response(
+    request: Request, user, db, response: Response = None, set_cookie: bool = False
+) -> dict:
     """
     Create JWT token and build session response for a user.
     Shared helper for signin, signup, ldap_auth, add_user, and token_exchange endpoints.
@@ -119,7 +112,10 @@ def create_session_response(request: Request, user, db, response: Response = Non
     )
 
     if set_cookie and response:
-        datetime_expires_at = datetime.datetime.fromtimestamp(expires_at, datetime.timezone.utc) if expires_at else None
+        datetime_expires_at = (
+            datetime.datetime.fromtimestamp(expires_at, datetime.timezone.utc)
+            if expires_at else None
+        )
         max_age = int(expires_delta.total_seconds()) if expires_delta else None
         response.set_cookie(
             key='token',
@@ -151,12 +147,16 @@ def create_session_response(request: Request, user, db, response: Response = Non
 ############################
 
 
-class SessionUserResponse(Token, UserProfileImageResponse):
+class SessionUserResponse(Token, UserProfileImageResponse):  # pylint: disable=too-few-public-methods
+    """Response model for session user data."""
+
     expires_at: Optional[int] = None
     permissions: Optional[dict] = None
 
 
-class SessionUserInfoResponse(SessionUserResponse, UserStatus):
+class SessionUserInfoResponse(SessionUserResponse, UserStatus):  # pylint: disable=too-few-public-methods
+    """Extended response model for session user info including profile details."""
+
     bio: Optional[str] = None
     gender: Optional[str] = None
     date_of_birth: Optional[datetime.date] = None
@@ -169,6 +169,7 @@ async def get_session_user(
     user=Depends(get_current_user),
     db: Session = Depends(get_session),
 ):
+    """Get the current session user's info."""
     auth_header = request.headers.get('Authorization')
     auth_token = get_http_authorization_cred(auth_header)
     token = auth_token.credentials
@@ -190,7 +191,10 @@ async def get_session_user(
         response.set_cookie(
             key='token',
             value=token,
-            expires=(datetime.datetime.fromtimestamp(expires_at, datetime.timezone.utc) if expires_at else None),
+            expires=(
+                datetime.datetime.fromtimestamp(expires_at, datetime.timezone.utc)
+                if expires_at else None
+            ),
             httponly=True,  # Ensures the cookie is not accessible via JavaScript
             samesite=WEBUI_AUTH_COOKIE_SAME_SITE,
             secure=WEBUI_AUTH_COOKIE_SECURE,
@@ -229,6 +233,7 @@ async def update_profile(
     session_user=Depends(get_verified_user),
     db: Session = Depends(get_session),
 ):
+    """Update the current user's profile."""
     if session_user:
         user = Users.update_user_by_id(
             session_user.id,
@@ -237,18 +242,13 @@ async def update_profile(
         )
         if user:
             return user
-        else:
-            raise HTTPException(400, detail=ERROR_MESSAGES.DEFAULT())
-    else:
-        raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
+        raise HTTPException(400, detail=ERROR_MESSAGES.DEFAULT())
+    raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
 
 
-############################
-# Update Timezone
-############################
+class UpdateTimezoneForm(BaseModel):  # pylint: disable=too-few-public-methods
+    """Form for updating user timezone."""
 
-
-class UpdateTimezoneForm(BaseModel):
     timezone: str
 
 
@@ -258,6 +258,7 @@ async def update_timezone(
     session_user=Depends(get_current_user),
     db: Session = Depends(get_session),
 ):
+    """Update the current user's timezone."""
     if session_user:
         Users.update_user_by_id(
             session_user.id,
@@ -265,8 +266,7 @@ async def update_timezone(
             db=db,
         )
         return {'status': True}
-    else:
-        raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
+    raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
 
 
 ############################
@@ -280,6 +280,7 @@ async def update_password(
     session_user=Depends(get_current_user),
     db: Session = Depends(get_session),
 ):
+    """Update the current user's password."""
     if WEBUI_AUTH_TRUSTED_EMAIL_HEADER:
         raise HTTPException(400, detail=ERROR_MESSAGES.ACTION_PROHIBITED)
     if session_user:
@@ -293,26 +294,24 @@ async def update_password(
             try:
                 validate_password(form_data.new_password)
             except Exception as e:
-                raise HTTPException(400, detail=str(e))
+                raise HTTPException(400, detail=str(e)) from e
             hashed = get_password_hash(form_data.new_password)
             return Auths.update_user_password_by_id(user.id, hashed, db=db)
-        else:
-            raise HTTPException(400, detail=ERROR_MESSAGES.INCORRECT_PASSWORD)
-    else:
-        raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
+        raise HTTPException(400, detail=ERROR_MESSAGES.INCORRECT_PASSWORD)
+    raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
 
 
 ############################
 # LDAP Authentication
 ############################
 @router.post('/ldap', response_model=SessionUserResponse)
-async def ldap_auth(
+async def ldap_auth(  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
     request: Request,
     response: Response,
     form_data: LdapForm,
     db: Session = Depends(get_session),
 ):
-    # Security checks FIRST - before loading any config
+    """Authenticate a user via LDAP."""
     if not request.app.state.config.ENABLE_LDAP:
         raise HTTPException(400, detail='LDAP authentication is not enabled')
 
@@ -322,8 +321,8 @@ async def ldap_auth(
             detail=ERROR_MESSAGES.ACTION_PROHIBITED,
         )
 
-    # NOW load LDAP config variables
-    LDAP_SERVER_LABEL = request.app.state.config.LDAP_SERVER_LABEL
+    # NOW load LDAP config variables  # pylint: disable=invalid-name
+    _ = request.app.state.config.LDAP_SERVER_LABEL  # unused but kept for config validation
     LDAP_SERVER_HOST = request.app.state.config.LDAP_SERVER_HOST
     LDAP_SERVER_PORT = request.app.state.config.LDAP_SERVER_PORT
     LDAP_ATTRIBUTE_FOR_MAIL = request.app.state.config.LDAP_ATTRIBUTE_FOR_MAIL
@@ -334,8 +333,12 @@ async def ldap_auth(
     LDAP_APP_PASSWORD = request.app.state.config.LDAP_APP_PASSWORD
     LDAP_USE_TLS = request.app.state.config.LDAP_USE_TLS
     LDAP_CA_CERT_FILE = request.app.state.config.LDAP_CA_CERT_FILE
-    LDAP_VALIDATE_CERT = CERT_REQUIRED if request.app.state.config.LDAP_VALIDATE_CERT else CERT_NONE
-    LDAP_CIPHERS = request.app.state.config.LDAP_CIPHERS if request.app.state.config.LDAP_CIPHERS else 'ALL'
+    LDAP_VALIDATE_CERT = (
+        CERT_REQUIRED if request.app.state.config.LDAP_VALIDATE_CERT else CERT_NONE
+    )
+    LDAP_CIPHERS = (
+        request.app.state.config.LDAP_CIPHERS if request.app.state.config.LDAP_CIPHERS else 'ALL'
+    )
 
     try:
         tls = Tls(
@@ -345,10 +348,10 @@ async def ldap_auth(
             ciphers=LDAP_CIPHERS,
         )
     except Exception as e:
-        log.error(f'TLS configuration error: {str(e)}')
-        raise HTTPException(400, detail='Failed to configure TLS for LDAP connection.')
+        log.error('TLS configuration error: %s', str(e))
+        raise HTTPException(400, detail='Failed to configure TLS for LDAP connection.') from e
 
-    try:
+    try:  # pylint: disable=too-many-nested-blocks
         server = Server(
             host=LDAP_SERVER_HOST,
             port=LDAP_SERVER_PORT,
@@ -377,13 +380,19 @@ async def ldap_auth(
         ]
         if ENABLE_LDAP_GROUP_MANAGEMENT:
             search_attributes.append(f'{LDAP_ATTRIBUTE_FOR_GROUPS}')
-            log.info(f'LDAP Group Management enabled. Adding {LDAP_ATTRIBUTE_FOR_GROUPS} to search attributes')
-        log.info(f'LDAP search attributes: {search_attributes}')
+            log.info(
+                'LDAP Group Management enabled. Adding %s to search attributes',
+                LDAP_ATTRIBUTE_FOR_GROUPS,
+            )
+        log.info('LDAP search attributes: %s', search_attributes)
 
         search_success = await asyncio.to_thread(
             connection_app.search,
             search_base=LDAP_SEARCH_BASE,
-            search_filter=f'(&({LDAP_ATTRIBUTE_FOR_USERNAME}={escape_filter_chars(form_data.user.lower())}){LDAP_SEARCH_FILTERS})',
+            search_filter=(
+                f'(&({LDAP_ATTRIBUTE_FOR_USERNAME}='
+                f'{escape_filter_chars(form_data.user.lower())}){LDAP_SEARCH_FILTERS})'
+            ),
             attributes=search_attributes,
         )
         if not search_success or not connection_app.entries:
@@ -391,18 +400,18 @@ async def ldap_auth(
 
         entry = connection_app.entries[0]
         entry_username = entry[f'{LDAP_ATTRIBUTE_FOR_USERNAME}'].value
-        email = entry[f'{LDAP_ATTRIBUTE_FOR_MAIL}'].value  # retrieve the Attribute value
+        email = entry[f'{LDAP_ATTRIBUTE_FOR_MAIL}'].value
 
-        username_list = []  # list of usernames from LDAP attribute
+        username_list = []
         if isinstance(entry_username, list):
             username_list = [str(name).lower() for name in entry_username]
         else:
             username_list = [str(entry_username).lower()]
 
-        # TODO: support multiple emails if LDAP returns a list
+        # TODO: support multiple emails if LDAP returns a list  # pylint: disable=fixme
         if not email:
             raise HTTPException(400, 'User does not have a valid email address.')
-        elif isinstance(email, str):
+        if isinstance(email, str):
             email = email.lower()
         elif isinstance(email, list):
             email = email[0].lower()
@@ -415,30 +424,38 @@ async def ldap_auth(
         user_groups = []
         if ENABLE_LDAP_GROUP_MANAGEMENT and LDAP_ATTRIBUTE_FOR_GROUPS in entry:
             group_dns = entry[LDAP_ATTRIBUTE_FOR_GROUPS]
-            log.info(f'LDAP raw group DNs for user {username_list}: {group_dns}')
+            log.info(
+                'LDAP raw group DNs for user %s: %s',
+                username_list,
+                group_dns,
+            )
 
             if group_dns:
-                log.info(f'LDAP group_dns original: {group_dns}')
-                log.info(f'LDAP group_dns type: {type(group_dns)}')
-                log.info(f'LDAP group_dns length: {len(group_dns)}')
+                log.info('LDAP group_dns original: %s', group_dns)
+                log.info('LDAP group_dns type: %s', type(group_dns))
+                log.info('LDAP group_dns length: %s', len(group_dns))
 
                 if hasattr(group_dns, 'value'):
                     group_dns = group_dns.value
-                    log.info(f'Extracted .value property: {group_dns}')
+                    log.info('Extracted .value property: %s', group_dns)
                 elif hasattr(group_dns, '__iter__') and not isinstance(group_dns, (str, bytes)):
                     group_dns = list(group_dns)
-                    log.info(f'Converted to list: {group_dns}')
+                    log.info('Converted to list: %s', group_dns)
 
                 if isinstance(group_dns, list):
                     group_dns = [str(item) for item in group_dns]
                 else:
                     group_dns = [str(group_dns)]
 
-                log.info(f'LDAP group_dns after processing - type: {type(group_dns)}, length: {len(group_dns)}')
+                log.info(
+                    'LDAP group_dns after processing - type: %s, length: %s',
+                    type(group_dns),
+                    len(group_dns),
+                )
 
                 for group_idx, group_dn in enumerate(group_dns):
                     group_dn = str(group_dn)
-                    log.info(f'Processing group DN #{group_idx + 1}: {group_dn}')
+                    log.info('Processing group DN #%s: %s', group_idx + 1, group_dn)
 
                     try:
                         group_cn = None
@@ -453,16 +470,22 @@ async def ldap_auth(
                             user_groups.append(group_cn)
 
                         else:
-                            log.warning(f'Could not extract CN from group DN: {group_dn}')
-                    except Exception as e:
-                        log.warning(f'Failed to extract group name from DN {group_dn}: {e}')
+                            log.warning('Could not extract CN from group DN: %s', group_dn)
+                    except Exception as e:  # pylint: disable=broad-exception-caught
+                        log.warning('Failed to extract group name from DN %s: %s', group_dn, e)
 
-                log.info(f'LDAP groups for user {username_list}: {user_groups} (total: {len(user_groups)})')
+                log.info(
+                    'LDAP groups for user %s: %s (total: %s)',
+                    username_list,
+                    user_groups,
+                    len(user_groups),
+                )
             else:
-                log.info(f'No groups found for user {username_list}')
+                log.info('No groups found for user %s', username_list)
         elif ENABLE_LDAP_GROUP_MANAGEMENT:
             log.warning(
-                f'LDAP Group Management enabled but {LDAP_ATTRIBUTE_FOR_GROUPS} attribute not found in user entry'
+                    'LDAP Group Management enabled but %s attribute not found in user entry',
+                    LDAP_ATTRIBUTE_FOR_GROUPS,
             )
 
         if username_list and form_data.user.lower() in username_list:
@@ -479,7 +502,10 @@ async def ldap_auth(
             user = Users.get_user_by_email(email, db=db)
             if not user:
                 try:
-                    role = 'admin' if not Users.has_users(db=db) else request.app.state.config.DEFAULT_USER_ROLE
+                    role = (
+                        'admin' if not Users.has_users(db=db)
+                        else request.app.state.config.DEFAULT_USER_ROLE
+                    )
 
                     user = Auths.insert_new_auth(
                         email=email,
@@ -500,9 +526,11 @@ async def ldap_auth(
 
                 except HTTPException:
                     raise
-                except Exception as err:
-                    log.error(f'LDAP user creation error: {str(err)}')
-                    raise HTTPException(500, detail='Internal error occurred during LDAP user creation.')
+                except Exception as err:  # pylint: disable=broad-exception-caught
+                    log.error('LDAP user creation error: %s', str(err))
+                    raise HTTPException(
+                        500, detail='Internal error occurred during LDAP user creation.'
+                    ) from err
 
             user = Auths.authenticate_user_by_email(email, db=db)
 
@@ -512,18 +540,20 @@ async def ldap_auth(
                         Groups.create_groups_by_group_names(user.id, user_groups, db=db)
                     try:
                         Groups.sync_groups_by_group_names(user.id, user_groups, db=db)
-                        log.info(f'Successfully synced groups for user {user.id}: {user_groups}')
-                    except Exception as e:
-                        log.error(f'Failed to sync groups for user {user.id}: {e}')
+                        log.info(
+                            'Successfully synced groups for user %s: %s',
+                            user.id,
+                            user_groups,
+                        )
+                    except Exception as e:  # pylint: disable=broad-exception-caught
+                        log.error('Failed to sync groups for user %s: %s', user.id, e)
 
                 return create_session_response(request, user, db, response, set_cookie=True)
-            else:
-                raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
-        else:
-            raise HTTPException(400, 'User record mismatch.')
-    except Exception as e:
-        log.error(f'LDAP authentication error: {str(e)}')
-        raise HTTPException(400, detail='LDAP authentication failed.')
+            raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
+        raise HTTPException(400, 'User record mismatch.')
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        log.error('LDAP authentication error: %s', str(e))
+        raise HTTPException(400, detail='LDAP authentication failed.') from e
 
 
 ############################
@@ -538,6 +568,7 @@ async def signin(
     form_data: SigninForm,
     db: Session = Depends(get_session),
 ):
+    """Sign in a user."""  # pylint: disable=too-many-branches,too-many-statements
     if not ENABLE_PASSWORD_AUTH:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -555,10 +586,8 @@ async def signin(
             name = request.headers.get(WEBUI_AUTH_TRUSTED_NAME_HEADER, email)
             try:
                 name = urllib.parse.unquote(name, encoding='utf-8')
-            except Exception as e:
+            except Exception:  # pylint: disable=broad-exception-caught
                 pass
-
-        if not Users.get_user_by_email(email.lower(), db=db):
             await signup_handler(
                 request,
                 email,
@@ -577,14 +606,16 @@ async def signin(
                     Groups.sync_groups_by_group_names(user.id, group_names, db=db)
 
             if WEBUI_AUTH_TRUSTED_ROLE_HEADER:
-                trusted_role = request.headers.get(WEBUI_AUTH_TRUSTED_ROLE_HEADER, '').lower().strip()
+                trusted_role = (
+                    request.headers.get(WEBUI_AUTH_TRUSTED_ROLE_HEADER, '').lower().strip()
+                )
                 if trusted_role in {'admin', 'user', 'pending'}:
                     if user.role != trusted_role:
                         Users.update_user_role_by_id(user.id, trusted_role, db=db)
                 elif trusted_role:
-                    log.warning(f'Ignoring invalid trusted role header value: {trusted_role}')
+                    log.warning('Ignoring invalid trusted role header value: %s', trusted_role)
 
-    elif WEBUI_AUTH == False:
+    elif not WEBUI_AUTH:
         admin_email = 'admin@localhost'
         admin_password = 'admin'
 
@@ -620,7 +651,7 @@ async def signin(
 
         password_bytes = form_data.password.encode('utf-8')
         if len(password_bytes) > 72:
-            # TODO: Implement other hashing algorithms that support longer passwords
+            # TODO: Implement other hashing algorithms  # pylint: disable=fixme
             log.info('Password too long, truncating to 72 bytes for bcrypt')
             password_bytes = password_bytes[:72]
 
@@ -635,8 +666,7 @@ async def signin(
 
     if user:
         return create_session_response(request, user, db, response, set_cookie=True)
-    else:
-        raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
+    raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
 
 
 ############################
@@ -644,7 +674,7 @@ async def signin(
 ############################
 
 
-async def signup_handler(
+async def signup_handler(  # pylint: disable=too-many-arguments
     request: Request,
     email: str,
     password: str,
@@ -711,15 +741,25 @@ async def signup(
     form_data: SignupForm,
     db: Session = Depends(get_session),
 ):
+    """Register a new user account."""  # pylint: disable=too-many-branches
     has_users = Users.has_users(db=db)
 
     if WEBUI_AUTH:
-        if not request.app.state.config.ENABLE_SIGNUP or not request.app.state.config.ENABLE_LOGIN_FORM:
+        if (
+            not request.app.state.config.ENABLE_SIGNUP
+            or not request.app.state.config.ENABLE_LOGIN_FORM
+        ):
             if has_users or not ENABLE_INITIAL_ADMIN_SIGNUP:
-                raise HTTPException(status.HTTP_403_FORBIDDEN, detail=ERROR_MESSAGES.ACCESS_PROHIBITED)
+                raise HTTPException(
+                    status.HTTP_403_FORBIDDEN,
+                    detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
+                )
     else:
         if has_users:
-            raise HTTPException(status.HTTP_403_FORBIDDEN, detail=ERROR_MESSAGES.ACCESS_PROHIBITED)
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
+            )
 
     if not validate_email_format(form_data.email.lower()):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=ERROR_MESSAGES.INVALID_EMAIL_FORMAT)
@@ -731,7 +771,7 @@ async def signup(
         try:
             validate_password(form_data.password)
         except Exception as e:
-            raise HTTPException(400, detail=str(e))
+            raise HTTPException(400, detail=str(e)) from e
 
         user = await signup_handler(
             request,
@@ -745,13 +785,13 @@ async def signup(
     except HTTPException:
         raise
     except Exception as err:
-        log.error(f'Signup error: {str(err)}')
-        raise HTTPException(500, detail='An internal error occurred during signup.')
+        log.error('Signup error: %s', str(err))
+        raise HTTPException(500, detail='An internal error occurred during signup.') from err
 
 
 @router.get('/signout')
 async def signout(request: Request, response: Response, db: Session = Depends(get_session)):
-    # get auth token from headers or cookies
+    """Sign out the current user."""
     token = None
     auth_header = request.headers.get('Authorization')
     if auth_header:
@@ -786,7 +826,8 @@ async def signout(request: Request, response: Response, db: Session = Depends(ge
             )
 
         oauth_server_metadata_url = (
-            request.app.state.oauth_manager.get_server_metadata_url(session.provider) if session else None
+            request.app.state.oauth_manager.get_server_metadata_url(session.provider)
+            if session else None
         ) or OPENID_PROVIDER_URL.value
 
         if session and oauth_server_metadata_url:
@@ -803,25 +844,28 @@ async def signout(request: Request, response: Response, db: Session = Depends(ge
                                     status_code=200,
                                     content={
                                         'status': True,
-                                        'redirect_url': f'{logout_url}?id_token_hint={oauth_id_token}'
-                                        + (
-                                            f'&post_logout_redirect_uri={WEBUI_AUTH_SIGNOUT_REDIRECT_URL}'
-                                            if WEBUI_AUTH_SIGNOUT_REDIRECT_URL
-                                            else ''
+                                        'redirect_url': (
+                                            f'{logout_url}?id_token_hint={oauth_id_token}'
+                                            + (
+                                                f'&post_logout_redirect_uri='
+                                                f'{WEBUI_AUTH_SIGNOUT_REDIRECT_URL}'
+                                                if WEBUI_AUTH_SIGNOUT_REDIRECT_URL
+                                                else ''
+                                            )
                                         ),
                                     },
                                     headers=response.headers,
                                 )
                         else:
-                            raise Exception('Failed to fetch OpenID configuration')
+                            raise RuntimeError('Failed to fetch OpenID configuration')
 
-            except Exception as e:
-                log.error(f'OpenID signout error: {str(e)}')
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                log.error('OpenID signout error: %s', str(e))
                 raise HTTPException(
                     status_code=500,
                     detail='Failed to sign out from the OpenID provider.',
                     headers=response.headers,
-                )
+                ) from e
 
     if WEBUI_AUTH_SIGNOUT_REDIRECT_URL:
         return JSONResponse(
@@ -848,6 +892,7 @@ async def add_user(
     user=Depends(get_admin_user),
     db: Session = Depends(get_session),
 ):
+    """Add a new user (admin only)."""
     if not validate_email_format(form_data.email.lower()):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=ERROR_MESSAGES.INVALID_EMAIL_FORMAT)
 
@@ -858,7 +903,7 @@ async def add_user(
         try:
             validate_password(form_data.password)
         except Exception as e:
-            raise HTTPException(400, detail=str(e))
+            raise HTTPException(400, detail=str(e)) from e
 
         hashed = get_password_hash(form_data.password)
         user = Auths.insert_new_auth(
@@ -887,13 +932,14 @@ async def add_user(
                 'role': user.role,
                 'profile_image_url': f'/api/v1/users/{user.id}/profile/image',
             }
-        else:
-            raise HTTPException(500, detail=ERROR_MESSAGES.CREATE_USER_ERROR)
+        raise HTTPException(500, detail=ERROR_MESSAGES.CREATE_USER_ERROR)
     except HTTPException:
         raise
     except Exception as err:
-        log.error(f'Add user error: {str(err)}')
-        raise HTTPException(500, detail='An internal error occurred while adding the user.')
+        log.error('Add user error: %s', str(err))
+        raise HTTPException(
+            500, detail='An internal error occurred while adding the user.'
+        ) from err
 
 
 ############################
@@ -902,12 +948,17 @@ async def add_user(
 
 
 @router.get('/admin/details')
-async def get_admin_details(request: Request, user=Depends(get_current_user), db: Session = Depends(get_session)):
+async def get_admin_details(
+    request: Request,
+    user=Depends(get_current_user),  # pylint: disable=unused-argument
+    db: Session = Depends(get_session),
+):
+    """Get admin user details."""
     if request.app.state.config.SHOW_ADMIN_DETAILS:
         admin_email = request.app.state.config.ADMIN_EMAIL
         admin_name = None
 
-        log.info(f'Admin details - Email: {admin_email}, Name: {admin_name}')
+        log.info('Admin details - Email: %s, Name: %s', admin_email, admin_name)
 
         if admin_email:
             admin = Users.get_user_by_email(admin_email, db=db)
@@ -923,8 +974,7 @@ async def get_admin_details(request: Request, user=Depends(get_current_user), db
             'name': admin_name,
             'email': admin_email,
         }
-    else:
-        raise HTTPException(400, detail=ERROR_MESSAGES.ACTION_PROHIBITED)
+    raise HTTPException(400, detail=ERROR_MESSAGES.ACTION_PROHIBITED)
 
 
 ############################
@@ -933,14 +983,16 @@ async def get_admin_details(request: Request, user=Depends(get_current_user), db
 
 
 @router.get('/admin/config')
-async def get_admin_config(request: Request, user=Depends(get_admin_user)):
+async def get_admin_config(request: Request, user=Depends(get_admin_user)):  # pylint: disable=unused-argument
+    """Get admin configuration."""
     return {
         'SHOW_ADMIN_DETAILS': request.app.state.config.SHOW_ADMIN_DETAILS,
         'ADMIN_EMAIL': request.app.state.config.ADMIN_EMAIL,
         'WEBUI_URL': request.app.state.config.WEBUI_URL,
         'ENABLE_SIGNUP': request.app.state.config.ENABLE_SIGNUP,
         'ENABLE_API_KEYS': request.app.state.config.ENABLE_API_KEYS,
-        'ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS': request.app.state.config.ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS,
+        'ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS':
+            request.app.state.config.ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS,
         'API_KEYS_ALLOWED_ENDPOINTS': request.app.state.config.API_KEYS_ALLOWED_ENDPOINTS,
         'DEFAULT_USER_ROLE': request.app.state.config.DEFAULT_USER_ROLE,
         'DEFAULT_GROUP_ID': request.app.state.config.DEFAULT_GROUP_ID,
@@ -960,7 +1012,9 @@ async def get_admin_config(request: Request, user=Depends(get_admin_user)):
     }
 
 
-class AdminConfig(BaseModel):
+class AdminConfig(BaseModel):  # pylint: disable=too-few-public-methods
+    """Form model for admin configuration."""
+
     SHOW_ADMIN_DETAILS: bool
     ADMIN_EMAIL: Optional[str] = None
     WEBUI_URL: str
@@ -986,14 +1040,19 @@ class AdminConfig(BaseModel):
 
 
 @router.post('/admin/config')
-async def update_admin_config(request: Request, form_data: AdminConfig, user=Depends(get_admin_user)):
+async def update_admin_config(
+    request: Request, form_data: AdminConfig, user=Depends(get_admin_user)  # pylint: disable=unused-argument
+):
+    """Update admin configuration."""
     request.app.state.config.SHOW_ADMIN_DETAILS = form_data.SHOW_ADMIN_DETAILS
     request.app.state.config.ADMIN_EMAIL = form_data.ADMIN_EMAIL
     request.app.state.config.WEBUI_URL = form_data.WEBUI_URL
     request.app.state.config.ENABLE_SIGNUP = form_data.ENABLE_SIGNUP
 
     request.app.state.config.ENABLE_API_KEYS = form_data.ENABLE_API_KEYS
-    request.app.state.config.ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS = form_data.ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS
+    request.app.state.config.ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS = (
+        form_data.ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS
+    )
     request.app.state.config.API_KEYS_ALLOWED_ENDPOINTS = form_data.API_KEYS_ALLOWED_ENDPOINTS
 
     request.app.state.config.ENABLE_FOLDERS = form_data.ENABLE_FOLDERS
@@ -1032,7 +1091,8 @@ async def update_admin_config(request: Request, form_data: AdminConfig, user=Dep
         'WEBUI_URL': request.app.state.config.WEBUI_URL,
         'ENABLE_SIGNUP': request.app.state.config.ENABLE_SIGNUP,
         'ENABLE_API_KEYS': request.app.state.config.ENABLE_API_KEYS,
-        'ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS': request.app.state.config.ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS,
+        'ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS':
+            request.app.state.config.ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS,
         'API_KEYS_ALLOWED_ENDPOINTS': request.app.state.config.API_KEYS_ALLOWED_ENDPOINTS,
         'DEFAULT_USER_ROLE': request.app.state.config.DEFAULT_USER_ROLE,
         'DEFAULT_GROUP_ID': request.app.state.config.DEFAULT_GROUP_ID,
@@ -1052,7 +1112,9 @@ async def update_admin_config(request: Request, form_data: AdminConfig, user=Dep
     }
 
 
-class LdapServerConfig(BaseModel):
+class LdapServerConfig(BaseModel):  # pylint: disable=too-few-public-methods
+    """Configuration model for LDAP server settings."""
+
     label: str
     host: str
     port: Optional[int] = None
@@ -1069,7 +1131,10 @@ class LdapServerConfig(BaseModel):
 
 
 @router.get('/admin/config/ldap/server', response_model=LdapServerConfig)
-async def get_ldap_server(request: Request, user=Depends(get_admin_user)):
+async def get_ldap_server(
+    request: Request, user=Depends(get_admin_user)  # pylint: disable=unused-argument
+):
+    """Get LDAP server configuration."""
     return {
         'label': request.app.state.config.LDAP_SERVER_LABEL,
         'host': request.app.state.config.LDAP_SERVER_HOST,
@@ -1088,7 +1153,12 @@ async def get_ldap_server(request: Request, user=Depends(get_admin_user)):
 
 
 @router.post('/admin/config/ldap/server')
-async def update_ldap_server(request: Request, form_data: LdapServerConfig, user=Depends(get_admin_user)):
+async def update_ldap_server(
+    request: Request,
+    form_data: LdapServerConfig,
+    user=Depends(get_admin_user),  # pylint: disable=unused-argument
+):
+    """Update LDAP server configuration."""
     required_fields = [
         'label',
         'host',
@@ -1133,18 +1203,17 @@ async def update_ldap_server(request: Request, form_data: LdapServerConfig, user
 
 
 @router.get('/admin/config/ldap')
-async def get_ldap_config(request: Request, user=Depends(get_admin_user)):
+async def get_ldap_config(
+    request: Request, user=Depends(get_admin_user)  # pylint: disable=unused-argument
+):
+    """Get LDAP enabled status."""
     return {'ENABLE_LDAP': request.app.state.config.ENABLE_LDAP}
 
 
-class LdapConfigForm(BaseModel):
+class LdapConfigForm(BaseModel):  # pylint: disable=too-few-public-methods
+    """Form for updating LDAP enabled state."""
+
     enable_ldap: Optional[bool] = None
-
-
-@router.post('/admin/config/ldap')
-async def update_ldap_config(request: Request, form_data: LdapConfigForm, user=Depends(get_admin_user)):
-    request.app.state.config.ENABLE_LDAP = form_data.enable_ldap
-    return {'ENABLE_LDAP': request.app.state.config.ENABLE_LDAP}
 
 
 ############################
@@ -1154,10 +1223,15 @@ async def update_ldap_config(request: Request, form_data: LdapConfigForm, user=D
 
 # create api key
 @router.post('/api_key', response_model=ApiKey)
-async def generate_api_key(request: Request, user=Depends(get_current_user), db: Session = Depends(get_session)):
+async def generate_api_key(
+    request: Request, user=Depends(get_current_user), db: Session = Depends(get_session)
+):
+    """Create an API key for the current user."""
     if not request.app.state.config.ENABLE_API_KEYS or (
         user.role != 'admin'
-        and not has_permission(user.id, 'features.api_keys', request.app.state.config.USER_PERMISSIONS)
+        and not has_permission(
+            user.id, 'features.api_keys', request.app.state.config.USER_PERMISSIONS
+        )
     ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -1171,26 +1245,26 @@ async def generate_api_key(request: Request, user=Depends(get_current_user), db:
         return {
             'api_key': api_key,
         }
-    else:
-        raise HTTPException(500, detail=ERROR_MESSAGES.CREATE_API_KEY_ERROR)
+    raise HTTPException(500, detail=ERROR_MESSAGES.CREATE_API_KEY_ERROR)
 
 
 # delete api key
 @router.delete('/api_key', response_model=bool)
 async def delete_api_key(user=Depends(get_current_user), db: Session = Depends(get_session)):
+    """Delete the current user's API key."""
     return Users.delete_user_api_key_by_id(user.id, db=db)
 
 
 # get api key
 @router.get('/api_key', response_model=ApiKey)
 async def get_api_key(user=Depends(get_current_user), db: Session = Depends(get_session)):
+    """Get the current user's API key."""
     api_key = Users.get_user_api_key_by_id(user.id, db=db)
     if api_key:
         return {
             'api_key': api_key,
         }
-    else:
-        raise HTTPException(404, detail=ERROR_MESSAGES.API_KEY_NOT_FOUND)
+    raise HTTPException(404, detail=ERROR_MESSAGES.API_KEY_NOT_FOUND)
 
 
 ############################
@@ -1198,14 +1272,16 @@ async def get_api_key(user=Depends(get_current_user), db: Session = Depends(get_
 ############################
 
 
-class TokenExchangeForm(BaseModel):
+class TokenExchangeForm(BaseModel):  # pylint: disable=too-few-public-methods
+    """Form for token exchange requests."""
+
     token: str  # OAuth access token from external provider
 
 
 @router.post('/oauth/{provider}/token/exchange', response_model=SessionUserResponse)
 async def token_exchange(
     request: Request,
-    response: Response,
+    response: Response,  # pylint: disable=unused-argument
     provider: str,
     form_data: TokenExchangeForm,
     db: Session = Depends(get_session),
@@ -1247,21 +1323,24 @@ async def token_exchange(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail='Invalid token or unable to fetch user info',
             )
-    except Exception as e:
-        log.warning(f'Token exchange failed for provider {provider}: {e}')
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        log.warning('Token exchange failed for provider %s: %s', provider, e)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail='Invalid token or unable to validate with provider',
-        )
+        ) from e
 
     # Extract user information from the token claims
     email_claim = request.app.state.config.OAUTH_EMAIL_CLAIM
-    username_claim = request.app.state.config.OAUTH_USERNAME_CLAIM
+    _ = request.app.state.config.OAUTH_USERNAME_CLAIM  # available but not used directly
 
     # Get sub claim
-    sub = user_data.get(request.app.state.config.OAUTH_SUB_CLAIM or OAUTH_PROVIDERS[provider].get('sub_claim', 'sub'))
+    sub = user_data.get(
+        request.app.state.config.OAUTH_SUB_CLAIM
+        or OAUTH_PROVIDERS[provider].get('sub_claim', 'sub')
+    )
     if not sub:
-        log.warning(f'Token exchange failed: sub claim missing from user data')
+        log.warning('Token exchange failed: sub claim missing from user data')
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Token missing required 'sub' claim",
@@ -1269,7 +1348,7 @@ async def token_exchange(
 
     email = user_data.get(email_claim, '')
     if not email:
-        log.warning(f'Token exchange failed: email claim missing from user data')
+        log.warning('Token exchange failed: email claim missing from user data')
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail='Token missing required email claim',
