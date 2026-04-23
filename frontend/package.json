@@ -84,6 +84,7 @@
 		"pdfjs-dist": "^5.4.149",
 		"shiki": "^4.0.1",
 		"socket.io-client": "^4.2.0",
+		"svelte-confetti": "^2.3.2",
 		"svelte-sonner": "^0.3.19",
 		"tippy.js": "^6.3.7",
 		"turndown": "^7.2.0",
