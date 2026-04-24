@@ -1,528 +1,214 @@
-# Cortex - Advanced AI Agent Platform
+# Cortex - AI Agent Platform
 
-> A full-stack AI agent with long-term memory, dreaming cycles, tool execution, and multi-channel integration
+> A full-stack AI agent platform built on Open-WebUI, extended with memory management, dreaming cycles, tool execution, and multi-channel integrations.
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Status](https://img.shields.io/badge/status-Production%20Ready-brightgreen.svg)
-![Completion](https://img.shields.io/badge/completion-100%25-success.svg)
+![Status](https://img.shields.io/badge/status-In%20Development-yellow.svg)
 
-## 🟢 PROJECT STATUS: COMPLETE & PRODUCTION READY
+## Project Status
 
-**Last Verified**: April 20, 2026
+Active development. Core chat, memory, and dreaming systems are implemented. Some integrations (Discord, Tailscale) exist as stubs or are partially wired. Docker image builds are in the process of being stabilised. Not yet suitable for production deployment without further review and configuration.
 
-All core features are **fully implemented, tested, and production-ready**. The system includes:
-- ✅ Real-time memory management with database persistence
-- ✅ Memory consolidation through 5-phase dreaming cycles
-- ✅ Tool execution framework with multiple built-in tools
-- ✅ API streaming for real-time responses
-- ✅ Discord bot integration
-- ✅ CLI with full command set
-- ✅ Docker containerization
-- ✅ Responsive web UI with memory/dreams management
+## Features
 
-See [CORTEX_HEALTH_REPORT.md](./CORTEX_HEALTH_REPORT.md) for complete audit results.
+### AI Agent
+- Chat interface with persistent conversation history
+- Context-aware responses via connected LLM backends (Ollama / OpenAI-compatible)
+- Streaming responses
+- Multi-model support
 
-## 🌟 Features
+### Memory System
+- Memory storage and retrieval backed by PostgreSQL
+- Categorised memories with importance scoring
+- Semantic search across stored memories
+- Memory promotion to long-term storage
+- Built on `backend/agents/memory_core.py` and `backend/routers/memories.py`
 
-### 🤖 Advanced AI Agent
-- **Intelligent Conversations**: Chat with a persistent AI agent
-- **Context Awareness**: Understands conversation history and context
-- **Streaming Responses**: Real-time response streaming
-- **Multi-Model Support**: Compatible with various AI models
+### Dreaming Cycles
+- Background memory consolidation cycles
+- Pattern recognition and insight generation from stored memories
+- Configurable scheduling
+- Implemented in `backend/agents/dreaming_engine_real.py`
 
-### 💾 Long-Term Memory
-- **Automatic Memory Formation**: Captures important information from conversations
-- **Categorized Storage**: Organize memories by category (knowledge, events, preferences)
-- **Smart Search**: Find relevant memories with semantic search
-- **Importance Scoring**: Rate memories by importance (1-10)
-- **Memory Promotion**: Move memories to long-term storage
+### Tool Execution
+- Tool registry and executor (`backend/agents/tool_executor.py`)
+- Built-in tools accessible through the chat interface
+- Custom tool addition supported
 
-### 💭 Dreaming Cycles
-- **Memory Consolidation**: AI processes and consolidates memories during "dreams"
-- **Pattern Recognition**: Discovers patterns and connections in memory
-- **Insight Generation**: Creates new knowledge from existing memories
-- **Configurable Schedules**: Automatic or manual dream cycles
-- **Dream History**: Track all dreams and insights
+### Discord Integration
+- Discord bot stub present (`backend/app/integrations/discord_bot.py`, `backend/app/routes/discord_routes.py`)
+- **Status:** partial — wiring exists but full bot functionality requires configuration and testing
 
-### 🛠️ Tool Execution Framework
-- **Web Search**: Search the internet for information
-- **Code Execution**: Run Python code safely
-- **Custom Tools**: Easily add new tools and capabilities
-- **Execution History**: Track tool usage and results
-- **Status Monitoring**: Monitor tool health and availability
+### Tailscale Networking
+- Tailscale integration stub present (`backend/app/integrations/tailscale.py`, `backend/app/routes/network_routes.py`)
+- **Status:** partial — endpoints exist, full device management not verified
 
-### 🔧 Integration Capabilities
+### CLI
+- Python CLI client in `cli/` directory
+- Covers chat, memory, dreaming, and tool commands
 
-#### Discord Bot
-- Real-time Discord integration
-- Commands for chat, memory, dreaming, and tools
-- Activity logging
-- Multi-server support
-
-#### Tailscale Networking
-- Secure remote access
-- Device pairing and management
-- Network discovery
-- Encrypted communications
-
-#### CLI Tool
-- Command-line interface for all features
-- Scripting and automation support
-- Portable and terminal-friendly
-- Rich output formatting
-
-### 🌐 Modern Web Interface
-- **Real-time Chat**: WebSocket-based chat interface
-- **Memory Manager**: View, search, and manage memories
-- **System Status**: Real-time agent status dashboard
-- **Tool Browser**: Discover and execute tools
-- **Responsive Design**: Works on desktop and mobile
+### Web Interface
+- SvelteKit frontend (Svelte 5, TypeScript, Tailwind CSS 4)
+- Real-time WebSocket chat
+- Memory manager, notes, channels, workspace views
+- Local frontend build verified working
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
-- Docker & Docker Compose (recommended)
-- Or: Node.js 18+, Python 3.10+, PostgreSQL 12+
+- Docker & Docker Compose
+- Or: Node.js 18–22, Python 3.10–3.12, PostgreSQL 12+
 
-### Option 1: Docker Compose
-
-```bash
-# Clone repository
-cd /home/aster/Documents/Cortex-Project/cortex
-
-# Start with Docker Compose
-docker-compose up -d
-
-# Access application
-# Frontend: http://localhost:5173
-# Backend API: http://localhost:8000
-# API Docs: http://localhost:8000/docs
-```
-
-### Option 2: System-Wide Installation (Linux)
-
-Install Cortex as a system application with desktop launcher:
+### Docker Compose
 
 ```bash
-# Clone repository
-cd /home/aster/Documents/Cortex-Project
-
-# Install system-wide (requires sudo)
-sudo bash cortex/install-app.sh
-
-# Launch from anywhere
-cortex-launcher
+git clone https://github.com/olliemochi/Cortex
+cd Cortex
+cp .env.example .env   # fill in secrets
+docker compose up -d
 ```
 
-This installs:
-- ✅ Application to `/opt/cortex`
-- ✅ Launcher command: `cortex-launcher`
-- ✅ Desktop application entry
-- ✅ Shell completions (bash, zsh, fish)
-- ✅ Uninstall script: `cortex-uninstall`
+Frontend: http://localhost:3000  
+Backend API: http://localhost:8000  
+API Docs: http://localhost:8000/docs
 
-### Option 3: Manual Development
+### Manual Development
 
 ```bash
-# Clone repository
-cd /home/aster/Documents/Cortex-Project/cortex
+# Backend
+cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn main:app --reload
 
-# Setup virtual environment
-bash setup-venv.sh
-
-# Start development servers
-bash scripts/dev.sh
+# Frontend (separate terminal)
+cd frontend
+npm install
+npm run dev
 ```
 
-See [QUICK_START.md](QUICK_START.md) for detailed instructions.
+See [QUICK_START.md](QUICK_START.md) for more detail.
 
 ---
 
-## 📚 Documentation
+## Documentation
 
-- **[QUICK_START.md](QUICK_START.md)** - Get started in 5 minutes
-- **[SETUP_GUIDE.md](SETUP_GUIDE.md)** - Detailed setup and configuration
-- **[API_DOCUMENTATION.md](API_DOCUMENTATION.md)** - Complete API reference
-- **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** - Production deployment
-- **[PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)** - Project overview
-
-### Quick Reference: Installation Methods
-
-**Docker Compose** (Recommended)
-```bash
-docker-compose up -d
-```
-
-**System-Wide (Linux)**
-```bash
-sudo bash install-app.sh
-cortex-launcher  # Launch from anywhere
-```
-
-**Manual Development**
-```bash
-bash setup-venv.sh
-bash scripts/dev.sh
-```
+- [QUICK_START.md](QUICK_START.md) — setup in a few steps
+- [docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md) — detailed configuration
+- [docs/API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md) — API reference
+- [docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md) — deployment notes
 
 ---
 
-## 🔧 System Installation (Linux)
-
-### Install as System Application
-
-```bash
-sudo bash install-app.sh
-```
-
-This installation method is perfect for end users who want Cortex as a system application.
-
-**What Gets Installed:**
-
-| Component | Location |
-|-----------|----------|
-| Application Files | `/opt/cortex` |
-| Launcher Command | `/usr/local/bin/cortex-launcher` |
-| Desktop Entry | `/usr/local/share/applications/cortex.desktop` |
-| Application Icon | `/usr/local/share/icons/hicolor/256x256/apps/cortex.svg` |
-| Shell Completions | `/etc/bash_completion.d/`, `/usr/share/zsh/`, `/usr/share/fish/` |
-| Uninstall Script | `/usr/local/bin/cortex-uninstall` |
-
-**Features:**
-
-- ✅ Desktop application launcher (search for "Cortex" in your app menu)
-- ✅ Command-line launcher: `cortex-launcher`
-- ✅ Shell auto-completion for bash, zsh, and fish
-- ✅ One-command uninstall: `cortex-uninstall` (requires sudo)
-
-**Requirements:**
-
-- Linux-based operating system
-- Root/sudo access
-- Bash shell
-
-### Launching Cortex
-
-After installation, launch via:
-
-```bash
-# From command line
-cortex-launcher
-
-# From desktop (search for "Cortex" in app menu)
-# Click the Cortex application icon
-```
-
-### Uninstalling
-
-```bash
-sudo cortex-uninstall
-```
-
----
-
-### Technology Stack
+## Stack
 
 **Frontend**
-- Svelte 4.x + SvelteKit
-- TypeScript
-- Vite
-- Tailwind CSS
+- SvelteKit + Svelte 5, TypeScript, Vite, Tailwind CSS 4
 
 **Backend**
-- Python 3.10+
-- FastAPI
-- SQLAlchemy ORM
-- PostgreSQL
+- Python 3.10+, FastAPI, SQLAlchemy, PostgreSQL, Redis
 
 **Infrastructure**
 - Docker & Docker Compose
-- Nginx (optional)
-- Redis (optional)
-- Kubernetes ready
 
-### System Design
+---
+
+## Project Structure
 
 ```
-┌─────────────────────────────────────┐
-│   User Interfaces                   │
-│  ┌─────────────┬──────────┬────┐   │
-│  │ Web UI      │ Discord  │CLI │   │
-│  └──────┬──────┴────┬─────┴──┬─┘   │
-└─────────┼───────────┼────────┼─────┘
-          │           │        │
-┌─────────▼───────────▼────────▼─────┐
-│   API Gateway (FastAPI)             │
-│  ┌────────────────────────────────┐ │
-│  │ Chat | Memory | Tools | Dream  │ │
-│  └────────────────────────────────┘ │
-└─────────┬──────────────────────┬───┘
-          │                      │
-     ┌────▼────┐          ┌──────▼────┐
-     │ Agent    │          │ Services   │
-     │ Core     │          │ Layer      │
-     └────┬────┘          └──────┬────┘
-          │                      │
-┌─────────▼──────────────────────▼─────┐
-│   Data Layer                         │
-│  ┌────────┬──────────┬────────────┐  │
-│  │Database│ Memory   │ Embeddings │  │
-│  └────────┴──────────┴────────────┘  │
-└──────────────────────────────────────┘
+Cortex/
+├── frontend/          # SvelteKit UI
+│   └── src/
+│       ├── lib/
+│       │   ├── apis/
+│       │   ├── components/
+│       │   └── stores/
+│       └── routes/
+├── backend/           # FastAPI application
+│   ├── agents/        # Cortex agent, memory core, dreaming engine, tool executor
+│   ├── app/
+│   │   ├── integrations/  # Discord, Tailscale (partial)
+│   │   └── routes/
+│   ├── models/        # SQLAlchemy models
+│   ├── routers/       # API route handlers
+│   └── main.py
+├── cli/               # Python CLI client
+├── skills/            # Skill definitions for tool integrations
+├── docker-compose.yml
+├── Dockerfile.backend
+├── Dockerfile.frontend
+└── docs/
 ```
 
 ---
 
-## 📡 API Endpoints
+## API Reference
 
 ### Chat
-- `POST /api/chat/message` - Send message
-- `POST /api/chat/stream` - Stream response
-- `GET /api/chat/history` - Get chat history
-- `GET /api/chat/context` - Get agent state
+- `POST /api/chat/message` — send message
+- `POST /api/chat/stream` — stream response
+- `GET /api/chat/history` — conversation history
 
 ### Memory
-- `GET /api/memory/` - List memories
-- `POST /api/memory/add` - Add memory
-- `GET /api/memory/search` - Search memories
-- `POST /api/memory/promote/{id}` - Promote memory
-- `DELETE /api/memory/{id}` - Delete memory
+- `GET /api/memory/` — list memories
+- `POST /api/memory/add` — add memory
+- `GET /api/memory/search` — search memories
+- `POST /api/memory/promote/{id}` — promote to long-term
+- `DELETE /api/memory/{id}` — delete memory
 
 ### Dreaming
-- `GET /api/dreaming/status` - Get status
-- `POST /api/dreaming/run` - Start dream
-- `POST /api/dreaming/cancel` - Cancel dream
-- `GET /api/dreaming/history` - Get history
+- `GET /api/dreaming/status` — current status
+- `POST /api/dreaming/run` — start a cycle
+- `POST /api/dreaming/cancel` — cancel active cycle
+- `GET /api/dreaming/history` — cycle history
 
 ### Tools
-- `GET /api/tools/` - List tools
-- `POST /api/tools/{name}/execute` - Execute tool
-- `GET /api/tools/{name}/status` - Tool status
+- `GET /api/tools/` — list tools
+- `POST /api/tools/{name}/execute` — execute tool
 
-### Discord
-- `GET /api/discord/status` - Bot status
-- `POST /api/discord/start` - Start bot
-- `GET /api/discord/activity` - Activity log
-
-### Network
-- `GET /api/network/tailscale/status` - Network status
-- `POST /api/network/tailscale/connect` - Connect
-- `GET /api/network/tailscale/peers` - List peers
-
-See [API_DOCUMENTATION.md](API_DOCUMENTATION.md) for full details.
+See [docs/API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md) for full details.
 
 ---
 
-## 🛠️ Development
-
-### Project Structure
-
-```
-cortex/
-├── frontend/              # Svelte UI application
-│   ├── src/
-│   │   ├── lib/
-│   │   │   ├── api/      # API clients
-│   │   │   ├── components/
-│   │   │   └── stores/
-│   │   └── routes/
-│   └── Dockerfile
-├── backend/              # FastAPI application
-│   ├── app/
-│   │   ├── routes/       # API endpoints
-│   │   ├── models/       # Database models
-│   │   ├── services/     # Business logic
-│   │   ├── integrations/ # External services
-│   │   └── main.py
-│   ├── alembic/          # Database migrations
-│   ├── requirements.txt
-│   └── Dockerfile
-├── cli/                  # Command-line tool
-│   └── cortex_cli.py
-├── docker-compose.yml
-└── docs/                 # Documentation
-```
+## Development
 
 ### Running Tests
 
 ```bash
-# Backend tests
-cd cortex/backend
-pytest -v
-
-# Frontend tests
-cd cortex/frontend
-pnpm test
+cd backend
+pytest backend/test -v
 ```
 
-### Code Quality
+### Linting
 
 ```bash
-# Backend linting
-cd cortex/backend
-black .
-isort .
-flake8 .
-mypy .
+cd backend
+flake8 backend --max-line-length=127
 ```
 
 ---
 
-## 🚢 Deployment
-
-### Docker Compose
-```bash
-docker-compose up -d
-```
-
-### Kubernetes
-See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for K8s manifests.
-
-### Production Checklist
-- [ ] Configure environment variables
-- [ ] Set up SSL/TLS certificates
-- [ ] Configure database backups
-- [ ] Enable monitoring and logging
-- [ ] Set up health checks
-- [ ] Configure auto-scaling
-
----
-
-## 🔐 Security Features
-
-- **Encrypted Communications**: HTTPS/SSL support
-- **Authentication**: JWT-based API tokens
-- **Database Security**: SQL injection prevention
-- **CORS Configuration**: Restricted origin access
-- **Input Validation**: Pydantic validation
-- **Rate Limiting**: Prevent abuse
-- **Audit Logging**: Track all activities
-
----
-
-## 📊 Monitoring & Observability
-
-- **Health Checks**: Built-in endpoint monitoring
-- **Structured Logging**: JSON log format
-- **Performance Metrics**: Request timing
-- **Error Tracking**: Comprehensive error logging
-- **Activity Audit**: User activity logging
-
----
-
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
 4. Submit a pull request
 
----
-
-## 📝 License
-
-MIT License - See LICENSE file for details
-
-Cortex is built upon [OpenClaw](https://github.com/openclaw/openclaw) and [Open-WebUI](https://github.com/open-webui/open-webui), which are also MIT licensed. Full attribution is available in LICENSE_NOTICE.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ---
 
-## 🙋 Support
+## License
 
-- **Documentation**: [cortex.aetherassembly.org](https://cortex.aetherassembly.org)
-- **Issues**: [GitHub Issues](https://github.com/aetherassembly/Cortex/issues)
-- **Pull Requests**: [GitHub PRs](https://github.com/aetherassembly/Cortex/pulls)
-- **Email**: [support@aetherassembly.org](mailto:support@aetherassembly.org) for support
-- **Contact**: [contact@aetherassembly.org](mailto:contact@aetherassembly.org) for other inquiries
+MIT — see [LICENSE](LICENSE).
+
+Cortex builds on [Open-WebUI](https://github.com/open-webui/open-webui) (MIT). Full attribution in LICENSE.
 
 ---
 
-## 🎯 Roadmap
-
-- [x] Phase 1: Project initialization
-- [x] Phase 2: Backend setup
-- [x] Phase 3: Chat interface
-- [x] Phase 4: Discord integration
-- [x] Phase 5: CLI tool
-- [x] Phase 6: Tailscale networking
-- [x] Phase 7: Docker & deployment
-- [ ] Phase 8: Advanced AI features
-- [ ] Phase 9: Mobile app
-- [ ] Phase 10: Enterprise features
-
----
-
-## 🎉 Key Achievements
-
-✅ Full-stack AI agent platform  
-✅ Long-term memory management  
-✅ Dreaming cycle implementation  
-✅ Multi-channel integration (Web, Discord, CLI)  
-✅ Tailscale network support  
-✅ Docker containerization  
-✅ Production-ready deployment  
-✅ Comprehensive documentation  
-
----
-
-## 💡 Use Cases
-
-- **Personal Assistant**: Daily help and reminders
-- **Research Aid**: Information gathering and synthesis
-- **Learning Tool**: Educational conversations
-- **Team Collaboration**: Shared knowledge base
-- **Automation**: Scripting and task automation
-- **Analysis**: Data analysis and insights
-- **Customer Service**: Automated support
-
----
-
-## 🚀 Getting Started
-
-1. **[QUICK_START.md](QUICK_START.md)** - Start here
-2. **[SETUP_GUIDE.md](SETUP_GUIDE.md)** - Detailed setup
-3. **[API_DOCUMENTATION.md](API_DOCUMENTATION.md)** - API reference
-4. **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** - Deploy to production
-
----
-
-## 📈 Performance
-
-- **Response Time**: < 200ms average
-- **Memory Queries**: < 100ms average
-- **Concurrent Users**: 100+ with Docker Compose
-- **Database**: Supports 100k+ memories
-- **Scalability**: Horizontal scaling ready
-
----
-
-## 🔄 Continuous Integration
-
-- Automated testing on push
-- Code quality checks
-- Security scanning
-- Automated deployment
-
----
-
-## 📱 Platform Support
-
-- **Operating Systems**: Linux, macOS, Windows
-- **Browsers**: Chrome, Firefox, Safari, Edge
-- **Databases**: PostgreSQL 12+
-- **Python**: 3.10+
-- **Node.js**: 18+
-
----
-
-**Cortex** - Advanced AI Agent Platform by [AetherAssembly](https://aetherassembly.org)
-
-Built with attention to detail and best practices for modern AI applications. Based on the amazing work of [OpenClaw](https://github.com/openclaw/openclaw) and [Open-WebUI](https://github.com/open-webui/open-webui).
-
-Repository: [github.com/aetherassembly/Cortex](https://github.com/aetherassembly/Cortex)  
-Website: [cortex.aetherassembly.org](https://cortex.aetherassembly.org)
-
-*Last Updated: April 20, 2026*
+**Cortex** — AI Agent Platform by [AetherAssembly](https://aetherassembly.org)  
+Repository: [github.com/olliemochi/Cortex](https://github.com/olliemochi/Cortex)

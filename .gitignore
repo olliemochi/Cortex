@@ -17,6 +17,7 @@ dist/
 .next/
 .nuxt/
 .cache/
+.svelte-kit/
 .vuepress/dist/
 .serverless/
 .fusebox/
@@ -64,4 +65,3 @@ database.db
 
 # Development
 dev-docs/
-pylint_report.txt
