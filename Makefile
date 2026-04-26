@@ -103,7 +103,7 @@ docker-down:
 lint:
 	@echo "Running linters..."
 	cd frontend && npm run lint || true
-	cd backend && pylint backend/ || true
+	cd backend && pylint . --ignore=.venv,migrations || true
 
 format:
 	@echo "Formatting code..."

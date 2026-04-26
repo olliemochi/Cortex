@@ -1,28 +1,41 @@
-# Cortex Frontend Dockerfile
-# Part of the Cortex AI Agent Platform
+# Cortex Frontend Dockerfile (CI / root context)
 # Organization: AetherAssembly
 # License: MIT
+
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Copy package files first for layer caching
+COPY frontend/package*.json ./
+
+RUN npm install
+
+# Copy all source files (src, static, config)
+COPY frontend/src ./src
+COPY frontend/static ./static
+COPY frontend/*.config.* ./
+COPY frontend/*.json ./
+
+# Bake VITE env vars into static bundle at build time
+ARG VITE_API_URL=http://localhost:8000/api
+ARG VITE_WS_URL=ws://localhost:8000/ws
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_WS_URL=$VITE_WS_URL
+
+RUN npm run build
 
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy package files
-COPY frontend/package*.json ./
+RUN npm install -g serve
 
-# Install dependencies
-RUN npm install
+COPY --from=builder /app/build ./build
 
-# Copy source
-COPY frontend/src ./src
-COPY frontend/*.config.* ./
-COPY frontend/*.json ./
+EXPOSE 5173
 
-# Build
-RUN npm run build
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD wget -q --spider http://localhost:5173 || exit 1
 
-# Expose port
-EXPOSE 3000
-
-# Start
-CMD ["npm", "run", "preview"]
+CMD ["serve", "-s", "build", "-l", "5173"]

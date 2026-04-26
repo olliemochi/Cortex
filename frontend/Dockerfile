@@ -15,6 +15,12 @@ RUN npm install
 # Copy source
 COPY . .
 
+# Bake VITE env vars into static bundle at build time
+ARG VITE_API_URL=http://localhost:8000/api
+ARG VITE_WS_URL=ws://localhost:8000/ws
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_WS_URL=$VITE_WS_URL
+
 # Build
 RUN npm run build
 
@@ -26,8 +32,8 @@ WORKDIR /app
 # Install serve
 RUN npm install -g serve
 
-# Copy built assets from builder
-COPY --from=builder /app/.svelte-kit/build ./build
+# Copy built assets from builder (adapter-static outputs to build/, not .svelte-kit/build/)
+COPY --from=builder /app/build ./build
 COPY --from=builder /app/package.json ./package.json
 
 # Expose port

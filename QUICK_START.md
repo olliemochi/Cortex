@@ -1,9 +1,10 @@
 # Cortex Quick Start Guide
 
-## 🟢 PROJECT STATUS
-**Completion**: 100% ✅ | **Status**: Production Ready | **Last Updated**: April 20, 2026
+## Project Status
 
-All features are fully implemented and operational. Ready to deploy!
+**Status**: In Development | **Last Updated**: April 2026
+
+Core chat, memory, and dreaming systems are implemented. Discord and Tailscale integrations are partial stubs. Not yet suitable for production deployment without further review.
 
 ---
 
@@ -14,13 +15,17 @@ All features are fully implemented and operational. Ready to deploy!
 #### Option 1: Docker Compose (Easiest)
 
 ```bash
-# 1. Clone/navigate to project
-cd /home/aster/Documents/Cortex-Project
+# 1. Clone and enter the project
+git clone https://github.com/olliemochi/Cortex
+cd Cortex
 
-# 2. Start all services
+# 2. Copy and configure environment
+cp .env.example .env
+
+# 3. Start all services
 docker-compose up -d
 
-# 3. Access application
+# 4. Access application
 # Frontend: http://localhost:5173
 # Backend API: http://localhost:8000
 # API Docs: http://localhost:8000/docs
@@ -29,19 +34,21 @@ docker-compose up -d
 #### Option 2: Manual Setup
 
 **Backend**:
+
 ```bash
-cd cortex/backend
-python -m venv venv
-source venv/bin/activate
+cd backend
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-python -m uvicorn app.main:app --reload
+uvicorn main:app --reload
 ```
 
 **Frontend**:
+
 ```bash
-cd cortex/frontend
-pnpm install
-pnpm dev
+cd frontend
+npm install
+npm run dev
 ```
 
 ---
@@ -61,73 +68,53 @@ pnpm dev
 
 ```bash
 # Make it executable
-chmod +x cortex/cli/cortex_cli.py
+chmod +x cli/cortex_cli.py
 
-# Or use as module
-python -m cortex.cli.cortex_cli --help
+# Or run directly
+python cli/cortex_cli.py --help
 
 # Examples
-python -m cortex.cli.cortex_cli chat send "Hello Cortex"
-python -m cortex.cli.cortex_cli memory list
-python -m cortex.cli.cortex_cli memory search "important"
-python -m cortex.cli.cortex_cli dream status
-python -m cortex.cli.cortex_cli tools list
-python -m cortex.cli.cortex_cli status
+python cli/cortex_cli.py chat send "Hello Cortex"
+python cli/cortex_cli.py memory list
+python cli/cortex_cli.py memory search "important"
+python cli/cortex_cli.py dream status
+python cli/cortex_cli.py tools list
+python cli/cortex_cli.py status
 ```
 
 ### Discord Bot
 
+> **Note:** Discord integration is a partial stub. Endpoints exist but full bot functionality requires additional implementation.
+
 1. **Create Discord bot**:
    - Go to Discord Developer Portal
-   - Create application
-   - Add Bot
-   - Copy token
+   - Create application, add Bot, copy token
 
 2. **Start bot**:
+
    ```bash
-   curl -X POST http://localhost:8000/api/discord/start \
+   curl -X POST http://localhost:8000/api/cortex/discord/config \
      -H "Content-Type: application/json" \
      -d '{"token": "YOUR_BOT_TOKEN"}'
    ```
 
-3. **Use bot** in Discord:
-   ```
-   /chat What's the weather?
-   /memory add My important note
-   /memory search past events
-   /status
-   /dream
-   /help
-   ```
-
 ### Tailscale Integration
 
-1. **Initialize Tailscale**:
-   ```bash
-   curl -X POST http://localhost:8000/api/network/tailscale/connect
-   ```
-
-2. **Get status**:
-   ```bash
-   curl http://localhost:8000/api/network/tailscale/status
-   ```
-
-3. **List peers**:
-   ```bash
-   curl http://localhost:8000/api/network/tailscale/peers
-   ```
+> **Note:** Tailscale integration is a partial stub. Endpoints exist but full device management is not yet verified.
 
 ---
 
 ## Key Features
 
 ### 1. Chat & Conversation
+
 - Talk to Cortex AI agent
 - Streaming responses
 - Message history
 - Context awareness
 
 ### 2. Memory Management
+
 - Automatic memory from chats
 - Categorized storage
 - Search across memories
@@ -135,6 +122,7 @@ python -m cortex.cli.cortex_cli status
 - Long-term promotion
 
 ### 3. Dreaming Cycles
+
 - Memory consolidation
 - Pattern recognition
 - Insight generation
@@ -142,27 +130,15 @@ python -m cortex.cli.cortex_cli status
 - Scheduled or manual
 
 ### 4. Tool Execution
+
 - Execute external tools
 - Web search
 - Code execution
 - Custom tools
 - Status monitoring
 
-### 5. Discord Integration
-- Direct Discord chat
-- Memory commands
-- Status checks
-- Dream triggers
-- Activity logging
+### 5. CLI Interface
 
-### 6. Tailscale Networking
-- Secure remote access
-- Device pairing
-- Network management
-- Peer discovery
-- Auth key generation
-
-### 7. CLI Interface
 - Terminal commands
 - Full feature access
 - Automation support
@@ -227,7 +203,6 @@ curl http://localhost:8000/api/tools/
 ### Ports Already in Use
 
 ```bash
-# Kill process on port
 lsof -i :5173  # Frontend
 lsof -i :8000  # Backend
 kill -9 <PID>
@@ -236,7 +211,6 @@ kill -9 <PID>
 ### Database Connection Error
 
 ```bash
-# Check database
 docker ps | grep postgres
 docker logs cortex-postgres
 
@@ -248,7 +222,6 @@ docker-compose up -d
 ### Services Won't Start
 
 ```bash
-# Check logs
 docker-compose logs -f
 
 # Rebuild
@@ -260,10 +233,7 @@ docker-compose up -d
 ### API Not Responding
 
 ```bash
-# Check health
 curl http://localhost:8000/health
-
-# View logs
 docker-compose logs backend
 ```
 
@@ -273,18 +243,14 @@ docker-compose logs backend
 
 ### Environment Variables
 
-Create `.env` file:
+Copy `.env.example` to `.env` and fill in:
 
 ```env
 # Database
 DATABASE_URL=postgresql://cortex:cortex@localhost:5432/cortex_db
 
-# API
-API_PORT=8000
-API_WORKERS=4
-
 # Security
-SECRET_KEY=dev-secret-key
+SECRET_KEY=your-secret-key-here
 
 # Discord (optional)
 DISCORD_TOKEN=your_token_here
@@ -296,12 +262,11 @@ TAILSCALE_TAILNET=example.com
 
 ### Frontend Configuration
 
-In `cortex/frontend/.env.local`:
+In `frontend/.env`:
 
 ```env
 VITE_API_URL=http://localhost:8000/api
 VITE_WS_URL=ws://localhost:8000/ws
-VITE_ENV=development
 ```
 
 ---
@@ -311,30 +276,30 @@ VITE_ENV=development
 ### Adding New Features
 
 1. **Backend endpoint**:
-   - Create route in `app/routes/`
-   - Add to `app/main.py`
+   - Create route in `backend/routers/`
+   - Register it in `backend/main.py`
    - Test with `/docs`
 
 2. **Frontend component**:
-   - Create `.svelte` file
-   - Add API client method
-   - Import and use in route
+   - Create `.svelte` file in `frontend/src/`
+   - Add API client method in `frontend/src/lib/apis/`
+   - Import and use in the relevant route
 
 3. **Database table**:
-   - Add model in `app/models/`
-   - Create migration
-   - Apply with `alembic upgrade head`
+   - Add model in `backend/models/`
+   - Create migration: `cd backend && alembic revision --autogenerate -m "description"`
+   - Apply: `alembic upgrade head`
 
 ### Running Tests
 
 ```bash
 # Backend tests
-cd cortex/backend
-pytest
+cd backend
+pytest test -v
 
 # Frontend tests
-cd cortex/frontend
-pnpm test
+cd frontend
+npm test
 ```
 
 ### Viewing API Documentation
@@ -344,40 +309,31 @@ pnpm test
 
 ---
 
-## Next Steps
+## Project Structure
 
-1. **Customize** agent behavior in `app/config.py`
-2. **Add** more tools in `app/services/tools.py`
-3. **Create** Discord commands in `app/integrations/discord_bot.py`
-4. **Deploy** using `DEPLOYMENT_GUIDE.md`
-5. **Monitor** using logs and health endpoints
-6. **Scale** by adding more workers/replicas
+```bash
+Cortex/
+├── frontend/          # SvelteKit UI
+├── backend/           # FastAPI application
+│   ├── agents/        # CortexAgent, MemoryCore, DreamingEngine, ToolExecutor
+│   ├── app/
+│   │   └── integrations/  # Discord, Tailscale (partial stubs)
+│   ├── models/        # SQLAlchemy models
+│   ├── routers/       # API route handlers
+│   └── main.py
+├── cli/               # Python CLI client
+├── skills/            # Skill definitions
+├── docker-compose.yml
+├── Dockerfile.backend
+├── Dockerfile.frontend
+└── docs/
+```
 
 ---
 
 ## Help & Support
 
-- **Documentation**: See `SETUP_GUIDE.md`, `API_DOCUMENTATION.md`
-- **Deployment**: See `DEPLOYMENT_GUIDE.md`
-- **Issues**: Check `TROUBLESHOOTING.md` section
+- **Setup detail**: See `docs/SETUP_GUIDE.md`
+- **API reference**: See `docs/API_DOCUMENTATION.md`
+- **Deployment**: See `docs/DEPLOYMENT_GUIDE.md`
 - **Logs**: `docker-compose logs -f`
-
----
-
-## Project Structure
-
-```
-cortex/
-├── frontend/          # Svelte UI
-├── backend/          # Python API
-├── cli/              # Command-line tool
-├── docker-compose.yml
-├── SETUP_GUIDE.md
-├── API_DOCUMENTATION.md
-├── DEPLOYMENT_GUIDE.md
-└── QUICK_START.md    # This file
-```
-
----
-
-**Ready to use!** 🚀

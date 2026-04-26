@@ -13,12 +13,14 @@ Active development. Core chat, memory, and dreaming systems are implemented. Som
 ## Features
 
 ### AI Agent
+
 - Chat interface with persistent conversation history
 - Context-aware responses via connected LLM backends (Ollama / OpenAI-compatible)
 - Streaming responses
 - Multi-model support
 
 ### Memory System
+
 - Memory storage and retrieval backed by PostgreSQL
 - Categorised memories with importance scoring
 - Semantic search across stored memories
@@ -26,29 +28,35 @@ Active development. Core chat, memory, and dreaming systems are implemented. Som
 - Built on `backend/agents/memory_core.py` and `backend/routers/memories.py`
 
 ### Dreaming Cycles
+
 - Background memory consolidation cycles
 - Pattern recognition and insight generation from stored memories
 - Configurable scheduling
 - Implemented in `backend/agents/dreaming_engine_real.py`
 
 ### Tool Execution
+
 - Tool registry and executor (`backend/agents/tool_executor.py`)
 - Built-in tools accessible through the chat interface
 - Custom tool addition supported
 
 ### Discord Integration
+
 - Discord bot stub present (`backend/app/integrations/discord_bot.py`, `backend/app/routes/discord_routes.py`)
 - **Status:** partial — wiring exists but full bot functionality requires configuration and testing
 
 ### Tailscale Networking
+
 - Tailscale integration stub present (`backend/app/integrations/tailscale.py`, `backend/app/routes/network_routes.py`)
 - **Status:** partial — endpoints exist, full device management not verified
 
 ### CLI
+
 - Python CLI client in `cli/` directory
 - Covers chat, memory, dreaming, and tool commands
 
 ### Web Interface
+
 - SvelteKit frontend (Svelte 5, TypeScript, Tailwind CSS 4)
 - Real-time WebSocket chat
 - Memory manager, notes, channels, workspace views
@@ -59,6 +67,7 @@ Active development. Core chat, memory, and dreaming systems are implemented. Som
 ## Quick Start
 
 ### Prerequisites
+
 - Docker & Docker Compose
 - Or: Node.js 18–22, Python 3.10–3.12, PostgreSQL 12+
 
@@ -71,7 +80,7 @@ cp .env.example .env   # fill in secrets
 docker compose up -d
 ```
 
-Frontend: http://localhost:3000  
+Frontend: http://localhost:5173  
 Backend API: http://localhost:8000  
 API Docs: http://localhost:8000/docs
 
@@ -118,7 +127,7 @@ See [QUICK_START.md](QUICK_START.md) for more detail.
 
 ## Project Structure
 
-```
+```bash
 Cortex/
 ├── frontend/          # SvelteKit UI
 │   └── src/
@@ -148,11 +157,13 @@ Cortex/
 ## API Reference
 
 ### Chat
+
 - `POST /api/chat/message` — send message
 - `POST /api/chat/stream` — stream response
 - `GET /api/chat/history` — conversation history
 
 ### Memory
+
 - `GET /api/memory/` — list memories
 - `POST /api/memory/add` — add memory
 - `GET /api/memory/search` — search memories
@@ -160,12 +171,14 @@ Cortex/
 - `DELETE /api/memory/{id}` — delete memory
 
 ### Dreaming
+
 - `GET /api/dreaming/status` — current status
 - `POST /api/dreaming/run` — start a cycle
 - `POST /api/dreaming/cancel` — cancel active cycle
 - `GET /api/dreaming/history` — cycle history
 
 ### Tools
+
 - `GET /api/tools/` — list tools
 - `POST /api/tools/{name}/execute` — execute tool
 
@@ -179,14 +192,14 @@ See [docs/API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md) for full details.
 
 ```bash
 cd backend
-pytest backend/test -v
+pytest test -v
 ```
 
 ### Linting
 
 ```bash
 cd backend
-flake8 backend --max-line-length=127
+flake8 . --max-line-length=127
 ```
 
 ---

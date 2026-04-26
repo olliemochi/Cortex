@@ -8,6 +8,7 @@
 ## Overview
 
 The Cortex project structure has been reorganized to:
+
 1. **Separate developer documentation** into `dev-docs/` (aimed at maintainers)
 2. **Consolidate user-facing documentation** into `docs/` (for everyday users)
 3. **Keep root clean** with only essential files for getting started
@@ -18,7 +19,8 @@ The Cortex project structure has been reorganized to:
 ## Directory Structure
 
 ### Root Level (Essential Files Only)
-```
+
+```bash
 cortex/
 ├── README.md                  # Main project overview for users
 ├── QUICK_START.md            # Quick start guide (kept here for discoverability)
@@ -70,6 +72,7 @@ cortex/
 **Purpose**: Documentation for users setting up and using Cortex
 
 **Contents**:
+
 - `API_DOCUMENTATION.md` - REST API reference
 - `ARCHITECTURE.md` - System design overview
 - `DEPLOYMENT_GUIDE.md` - Production deployment instructions
@@ -88,6 +91,7 @@ cortex/
 **Purpose**: Documentation for maintainers, contributors, and Cortex developers
 
 **Contents**:
+
 - `IMPLEMENTATION_STATUS.md` - Feature completeness tracking
 - `BACKEND_COMPLETION.md` - Backend implementation details
 - `CORTEX_HEALTH_REPORT.md` - System audit and verification
@@ -108,6 +112,7 @@ cortex/
 **Purpose**: GitHub-specific automation and configuration
 
 **Contents**:
+
 - `README.md` - Guide to what's in this directory
 - `CODEOWNERS` - Code ownership and review routing
 - `pull_request_template.md` - PR template for consistency
@@ -117,10 +122,12 @@ cortex/
 - `workflows/` - GitHub Actions automation
 
 **Sources**:
+
 - Merged from OpenClaw (.github/) for workflows and standards
 - Merged from Open WebUI (.github/) for additional ecosystem support
 
 **Features**:
+
 - ✅ Automated npm dependency updates
 - ✅ Automated pip/uv dependency updates
 - ✅ Consistent PR and issue templates
@@ -132,11 +139,13 @@ cortex/
 ## Root-Level Files (What Remains)
 
 ### User Entry Points
+
 - **README.md** - Main project overview (kept for visibility)
 - **QUICK_START.md** - Quick start guide (kept for easy discovery)
 - **CONTRIBUTING.md** - Contribution guidelines
 
 ### Setup & Deployment
+
 - **START_HERE.sh** - First-run entry point
 - **setup-venv.sh** - Python virtual environment setup
 - **install.sh** - Installation script
@@ -145,6 +154,7 @@ cortex/
 - **tailscale.sh** - Tailscale integration
 
 ### Container & Configuration
+
 - **.env** - Runtime configuration (created during setup)
 - **.env.example** - Configuration template
 - **.gitignore** - Git rules
@@ -153,6 +163,7 @@ cortex/
 - **Dockerfile.frontend** - Frontend image
 
 ### Project Directories
+
 - **backend/** - FastAPI backend (not moved)
 - **frontend/** - SvelteKit frontend (not moved)
 - **cli/** - Command-line interface (not moved)
@@ -166,7 +177,7 @@ cortex/
 ## Files Moved to `docs/`
 
 | File | Purpose | Users |
-|------|---------|-------|
+| ---- | ------- | ----- |
 | API_DOCUMENTATION.md | REST API endpoints and usage | API consumers, integrators |
 | ARCHITECTURE.md | System design and components | Developers, architects |
 | DEPLOYMENT_GUIDE.md | Production deployment | DevOps, system admins |
@@ -179,7 +190,7 @@ cortex/
 ## Files Moved to `dev-docs/`
 
 | File | Purpose | Users |
-|------|---------|-------|
+| ---- | ------- | ----- |
 | IMPLEMENTATION_STATUS.md | Feature completeness | Maintainers, contributors |
 | BACKEND_COMPLETION.md | Backend details | Backend developers |
 | CORTEX_HEALTH_REPORT.md | System verification | QA, maintainers |
@@ -194,18 +205,21 @@ cortex/
 ## Workflow Improvements
 
 ### For Users
+
 1. **Cleaner root** - Only essential setup and config files visible
 2. **Clear docs path** - `docs/` folder for all documentation
 3. **Quick start** - README and QUICK_START at root for easy access
 4. **Setup helpers** - Scripts are grouped and clear
 
 ### For Developers
+
 1. **Separate workspace** - `dev-docs/` for internal documentation
 2. **Clear standards** - GitHub config in `.github/` follows conventions
 3. **Automated checks** - Dependabot handles dependency updates
 4. **PR consistency** - Templates ensure quality PRs
 
 ### For Maintainers
+
 1. **Project health** - Health report in easy-to-find location
 2. **Status tracking** - Implementation status clearly documented
 3. **GitHub automation** - Workflows and automation configured
@@ -216,7 +230,8 @@ cortex/
 ## Access Patterns
 
 ### New Users
-```
+
+```bash
 cortex/
   ├─ README.md              ← Start here
   ├─ QUICK_START.md         ← Get running fast
@@ -227,7 +242,8 @@ cortex/
 ```
 
 ### Developers Contributing
-```
+
+```bash
 cortex/
   ├─ CONTRIBUTING.md        ← Contribution rules
   ├─ .github/README.md      ← PR standards
@@ -238,7 +254,8 @@ cortex/
 ```
 
 ### Maintainers/Admins
-```
+
+```bash
 cortex/
   ├─ dev-docs/
   │   ├─ CORTEX_HEALTH_REPORT.md      ← System status
@@ -254,16 +271,19 @@ cortex/
 ## GitHub Integration (`.github/`)
 
 ### From OpenClaw
+
 - **Workflows** - CI/CD and automation patterns
 - **ISSUE_TEMPLATE** - Consistent issue creation
 - **CODEOWNERS** - Review routing
 - **pull_request_template.md** - PR standards
 
 ### From Open WebUI
+
 - **FUNDING.yml** - Sponsorship integration
 - **dependabot.yml** (extended) - Python ecosystem updates
 
 ### Cortex-Specific
+
 - **Merged dependabot.yml** - Handles:
   - npm (frontend)
   - pip/uv (backend)
@@ -275,7 +295,8 @@ cortex/
 ## Before & After
 
 ### Before (Cluttered Root)
-```
+
+```bash
 cortex/
 ├── README.md
 ├── QUICK_START.md
@@ -290,7 +311,8 @@ cortex/
 ```
 
 ### After (Organized Structure)
-```
+
+```bash
 cortex/
 ├── README.md                    ← Entry point
 ├── QUICK_START.md              ← Quick start
@@ -315,7 +337,7 @@ cortex/
 ## Statistics
 
 | Metric | Value |
-|--------|-------|
+| ------ | ----- |
 | Files moved to `docs/` | 6 |
 | Files moved to `dev-docs/` | 8 |
 | New directories created | 3 |
@@ -344,4 +366,4 @@ cortex/
 ✅ **Structure scalable** - Easy to add more files as project grows  
 ✅ **Navigation clear** - Each user type knows where to look  
 
-**Cortex project structure is now production-ready and maintainer-friendly! 🚀**
+**Cortex project structure is now production-ready and maintainer-friendly!** 🚀
